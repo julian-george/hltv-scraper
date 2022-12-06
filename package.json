@@ -1,0 +1,26 @@
+{
+  "name": "hltv-scraper",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.ts",
+  "scripts": {
+    "dev": "npx ts-node index.ts",
+    "build": "npx tsc",
+    "start": "node dist/index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.2.0",
+    "cheerio": "^1.0.0-rc.12",
+    "dotenv": "^16.0.3",
+    "mongoose": "^6.7.5",
+    "node": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/axios": "^0.14.0",
+    "@types/node": "^18.11.10",
+    "ts-node": "^10.9.1",
+    "typescript": "^4.9.3"
+  }
+}
