@@ -6,28 +6,14 @@ import { createEvent, getEventByHltvId } from "./services/event-service";
 import { createPlayer, getPlayerByHltvId } from "./services/player-service";
 import { createMap, getMapByHltvId } from "./services/map-service";
 import { createMatch, getMatchByHltvId } from "./services/match-service";
+import puppeteerGet from "./scrape-client";
 
 dotenv.config();
 
 const CACHED = !!process.env.CACHED;
+const ABORT_UPON_DUPLICATE = process.env.ABORT_UPON_DUPLICATE || 0;
 const RESULT_LIMIT = Infinity;
 const PLAYER_LIMIT = Infinity;
-
-axios.defaults.baseURL = "http://localhost:3000/?url=https://www.hltv.org";
-axios.defaults.headers.get["accept-encoding"] = "null";
-axios.interceptors.request.use(
-  async (config) => {
-    return new Promise((resolve, reject) =>
-      setTimeout(() => {
-        resolve(config);
-      }, Math.random() * 3000 + 2000)
-    );
-  },
-  async (error) => {
-    // Do something with request error
-    return Promise.reject(error);
-  }
-);
 
 export const parseMatch = async ($: CheerioAPI, matchId: number) => {
   const hltvId = matchId;
@@ -67,7 +53,7 @@ export const parseMatch = async ($: CheerioAPI, matchId: number) => {
         eventId
       );
     } else {
-      const eventPage = (await axios.get(eventUrl)).data;
+      const eventPage = await puppeteerGet(eventUrl);
       if (!fs.existsSync("cached/event-page.html")) {
         fs.writeFile("cached/event-page.html", eventPage, (err) => {
           if (err) throw err;
@@ -95,7 +81,7 @@ export const parseMatch = async ($: CheerioAPI, matchId: number) => {
           playerId
         );
       } else {
-        const playerPage = (await axios.get(playerUrl)).data;
+        const playerPage = await puppeteerGet(playerUrl);
         if (!fs.existsSync("cached/player-page.html")) {
           fs.writeFile("cached/player-page.html", playerPage, (err) => {
             if (err) throw err;
@@ -124,7 +110,7 @@ export const parseMatch = async ($: CheerioAPI, matchId: number) => {
         matchId
       );
     } else {
-      const mapPage = (await axios.get(mapUrl)).data;
+      const mapPage = await puppeteerGet(mapUrl);
       if (!fs.existsSync("cached/map-page.html")) {
         fs.writeFile("cached/map-page.html", mapPage, (err) => {
           if (err) throw err;
@@ -188,7 +174,7 @@ const parseMap = async ($: CheerioAPI, mapId: number, matchId: number) => {
       load(fs.readFileSync("cached/map-performance-page.html"))
     ));
   } else {
-    const mapPage = (await axios.get(mapPerformanceUrl)).data;
+    const mapPage = await puppeteerGet(mapPerformanceUrl);
     if (!fs.existsSync("cached/map-performance-page.html")) {
       fs.writeFile("cached/map-performance-page.html", mapPage, (err) => {
         if (err) throw err;
@@ -454,6 +440,10 @@ export const parseResults = async ($: CheerioAPI) => {
     const matchId = Number(resultUrl.split("/")[2]);
     const match = await getMatchByHltvId(matchId);
     if (match) {
+      if (ABORT_UPON_DUPLICATE) {
+        console.log("Match ID " + matchId + " already in database, aborting.");
+        return;
+      }
       console.log("Match ID " + matchId + " already in database, skipping.");
       continue;
     }
@@ -465,7 +455,7 @@ export const parseResults = async ($: CheerioAPI) => {
         console.log("Unable to parse match ID " + matchId + ", skipping it.");
       });
     } else {
-      const resultsPage = (await axios.get(resultUrl)).data;
+      const resultsPage = await puppeteerGet(resultUrl);
       if (!fs.existsSync("cached/result-page.html")) {
         fs.writeFile("cached/result-page.html", resultsPage, (err) => {
           if (err) throw err;
@@ -482,4 +472,7 @@ export const parseResults = async ($: CheerioAPI) => {
       });
     }
   }
+  const nextLink = $("a.pagination-next").attr("href");
+  const nextResultsPage = await puppeteerGet(nextLink);
+  await parseResults(load(nextResultsPage));
 };

@@ -4,10 +4,12 @@ import { load } from "cheerio";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import { parseResults } from "./scraper";
+import scrapeClient from "./scrape-client";
 
 dotenv.config();
 
 const MONGODB_URI = process.env.MONGODB_URI;
+const RESULT_OFFSET = process.env.RESULT_OFFSET || 0;
 
 mongoose
   .connect(MONGODB_URI)
@@ -19,18 +21,15 @@ mongoose
     throw err;
   });
 
-axios.defaults.baseURL = "http://localhost:3000/?url=https://www.hltv.org";
-axios.defaults.headers.get["accept-encoding"] = "null";
-
 if (process.env.CACHED) {
   parseResults(load(fs.readFileSync("cached/results-browser.html")));
 } else {
-  axios.get("/results").then(({ data }) => {
+  scrapeClient(`/results?offset=${RESULT_OFFSET}`).then((resultsPage) => {
     if (!fs.existsSync("cached/results-browser.html")) {
-      fs.writeFile("cached/results-browser.html", data, (err) => {
+      fs.writeFile("cached/results-browser.html", resultsPage, (err) => {
         if (err) throw err;
       });
     }
-    parseResults(load(data));
+    parseResults(load(resultsPage));
   });
 }
