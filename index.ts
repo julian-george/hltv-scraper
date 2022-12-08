@@ -19,13 +19,18 @@ mongoose
     throw err;
   });
 
-axios.defaults.baseURL = "https://www.hltv.org";
+axios.defaults.baseURL = "http://localhost:3000/?url=https://www.hltv.org";
 axios.defaults.headers.get["accept-encoding"] = "null";
 
 if (process.env.CACHED) {
   parseResults(load(fs.readFileSync("cached/results-browser.html")));
 } else {
   axios.get("/results").then(({ data }) => {
+    if (!fs.existsSync("cached/results-browser.html")) {
+      fs.writeFile("cached/results-browser.html", data, (err) => {
+        if (err) throw err;
+      });
+    }
     parseResults(load(data));
   });
 }

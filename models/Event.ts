@@ -13,7 +13,7 @@ export const eventSchema = new Schema({
   teamRankings: [Number],
   location: String,
   online: Boolean,
-  format: String,
+  format: Object,
 });
 
 const Event = model("Event", eventSchema);

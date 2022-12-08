@@ -5,6 +5,10 @@ export const matchSchema = new Schema({
     type: Number,
     unique: true,
   },
+  eventId: {
+    type: Number,
+  },
+  title: String,
   date: Date,
   format: String,
   online: Boolean,
