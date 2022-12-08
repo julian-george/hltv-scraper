@@ -10,8 +10,8 @@ import { createMatch, getMatchByHltvId } from "./services/match-service";
 dotenv.config();
 
 const CACHED = !!process.env.CACHED;
-const RESULT_LIMIT = 2;
-const PLAYER_LIMIT = 2;
+const RESULT_LIMIT = Infinity;
+const PLAYER_LIMIT = Infinity;
 
 axios.defaults.baseURL = "http://localhost:3000/?url=https://www.hltv.org";
 axios.defaults.headers.get["accept-encoding"] = "null";
@@ -20,7 +20,7 @@ axios.interceptors.request.use(
     return new Promise((resolve, reject) =>
       setTimeout(() => {
         resolve(config);
-      }, Math.random() * 1000 + 4000)
+      }, Math.random() * 3000 + 2000)
     );
   },
   async (error) => {
@@ -76,7 +76,10 @@ export const parseMatch = async ($: CheerioAPI, matchId: number) => {
       await parseEvent(load(eventPage), eventId);
     }
   }
-  await createMatch({ hltvId, eventId, date, format, online, matchType });
+  await createMatch({ hltvId, eventId, date, format, online, matchType }).catch(
+    (err) =>
+      console.error("Unable to add match ID " + hltvId + " to database: ", err)
+  );
 
   const playerLinks = $("td.players > .flagAlign > a")
     .toArray()
@@ -115,7 +118,11 @@ export const parseMatch = async ($: CheerioAPI, matchId: number) => {
       continue;
     }
     if (CACHED) {
-      parseMap(load(fs.readFileSync("cached/map-page.html")), mapId, matchId);
+      await parseMap(
+        load(fs.readFileSync("cached/map-page.html")),
+        mapId,
+        matchId
+      );
     } else {
       const mapPage = (await axios.get(mapUrl)).data;
       if (!fs.existsSync("cached/map-page.html")) {
@@ -123,7 +130,7 @@ export const parseMatch = async ($: CheerioAPI, matchId: number) => {
           if (err) throw err;
         });
       }
-      parseMap(load(mapPage), mapId, matchId);
+      await parseMap(load(mapPage), mapId, matchId);
     }
   }
 };
@@ -249,14 +256,16 @@ const parseMap = async ($: CheerioAPI, mapId: number, matchId: number) => {
       hltvId,
     });
   }
-  await createMap({
+  createMap({
     hltvId: Number(hltvId),
     matchId,
     mapType,
     score,
     teamOneStats,
     teamTwoStats,
-  });
+  }).catch((err) =>
+    console.error("Unable to add map ID " + hltvId + " to database: ", err)
+  );
 };
 
 const parseMapPerformance = async ($: CheerioAPI) => {
@@ -388,7 +397,7 @@ const parseEvent = async ($: CheerioAPI, eventId: number) => {
       teamRankings.push(null);
     }
   } catch {}
-  await createEvent({
+  createEvent({
     hltvId,
     title,
     startDate,
@@ -399,7 +408,9 @@ const parseEvent = async ($: CheerioAPI, eventId: number) => {
     online,
     format,
     teamRankings,
-  });
+  }).catch((err) =>
+    console.error("Unable to add event ID " + hltvId + " to database: ", err)
+  );
 };
 
 const parsePlayer = async ($: CheerioAPI, playerId: number) => {
@@ -429,44 +440,45 @@ const parsePlayer = async ($: CheerioAPI, playerId: number) => {
     if (!nationality)
       nationality = $($(".player-realname > .flag")[0]).attr("title");
   } catch {}
-  await createPlayer({ hltvId, name, birthYear, nationality });
+  createPlayer({ hltvId, name, birthYear, nationality }).catch((err) =>
+    console.error("Unable to add player ID " + hltvId + " to database: ", err)
+  );
 };
 
-export const parseResults = ($: CheerioAPI) => {
+export const parseResults = async ($: CheerioAPI) => {
   const resultLinks = $("div.result-con > a")
     .toArray()
     .slice(0, CACHED ? 1 : RESULT_LIMIT);
   for (const resultLink of resultLinks) {
     const resultUrl = resultLink.attribs["href"];
     const matchId = Number(resultUrl.split("/")[2]);
-    const match = getMatchByHltvId(matchId);
+    const match = await getMatchByHltvId(matchId);
     if (match) {
       console.log("Match ID " + matchId + " already in database, skipping.");
       continue;
     }
     if (CACHED) {
-      parseMatch(
+      await parseMatch(
         load(fs.readFileSync("cached/result-page.html")),
         matchId
       ).catch((err) => {
         console.log("Unable to parse match ID " + matchId + ", skipping it.");
       });
     } else {
-      axios.get(resultUrl).then(async ({ data }) => {
-        if (!fs.existsSync("cached/result-page.html")) {
-          fs.writeFile("cached/result-page.html", data, (err) => {
-            if (err) throw err;
-          });
-        }
-        parseMatch(load(data), matchId).catch((err) => {
-          console.log(
-            "Unable to parse match ID " +
-              matchId +
-              ", reason: '" +
-              err +
-              "', skipping it."
-          );
+      const resultsPage = (await axios.get(resultUrl)).data;
+      if (!fs.existsSync("cached/result-page.html")) {
+        fs.writeFile("cached/result-page.html", resultsPage, (err) => {
+          if (err) throw err;
         });
+      }
+      await parseMatch(load(resultsPage), matchId).catch((err) => {
+        console.log(
+          "Unable to parse match ID " +
+            matchId +
+            ", reason: '" +
+            err +
+            "', skipping it."
+        );
       });
     }
   }

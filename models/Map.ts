@@ -28,7 +28,6 @@ export const playerHalfStatsSchema = new Schema({
 export const playerStatsSchema = new Schema({
   hltvId: {
     type: Number,
-    unique: true,
   },
   // formatted {hltvId: #kills against them}
   duelMap: {
