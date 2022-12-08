@@ -24,7 +24,7 @@ const responseHeadersToRemove = [
 
 const BASE_URL = "https://www.hltv.org";
 let options = {
-  headless: false,
+  headless: true,
   args: ["--no-sandbox", "--disable-setuid-sandbox"],
 };
 // if (process.env.PUPPETEER_SKIP_CHROMIUM_DOWNLOAD)
@@ -49,6 +49,7 @@ const puppeteerGet = async (url: string) => {
   );
   const currBrowser = await getPuppeteerClient();
   url = BASE_URL + url;
+  console.log("Scraping", url);
   let responseBody;
   let responseData;
   let responseHeaders;
