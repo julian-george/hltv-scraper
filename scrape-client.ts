@@ -1,18 +1,11 @@
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
-puppeteer.use(StealthPlugin());
+import dotenv from "dotenv";
+import { Browser } from "puppeteer";
 
-const headersToRemove = [
-  "host",
-  "user-agent",
-  "accept",
-  "accept-encoding",
-  "content-length",
-  "forwarded",
-  "x-forwarded-proto",
-  "x-forwarded-for",
-  "x-cloud-trace-context",
-];
+puppeteer.use(StealthPlugin());
+dotenv.config();
+
 const responseHeadersToRemove = [
   "Accept-Ranges",
   "Content-Length",
@@ -27,32 +20,30 @@ let options = {
   headless: true,
   args: ["--no-sandbox", "--disable-setuid-sandbox"],
 };
-// if (process.env.PUPPETEER_SKIP_CHROMIUM_DOWNLOAD)
-//   options.executablePath = "/usr/bin/chromium-browser";
-if (process.env.PUPPETEER_HEADFUL) options.headless = false;
-// if (process.env.PUPPETEER_USERDATADIR)
-//   options.userDataDir = process.env.PUPPETEER_USERDATADIR;
-if (process.env.PUPPETEER_PROXY)
-  options.args.push(`--proxy-server=${process.env.PUPPETEER_PROXY}`);
-let browser = null;
+if (process.env.HEADFUL) options.headless = false;
+let browser: Browser | null = null;
 export const getPuppeteerClient = async () => {
-  if (!browser) browser = await puppeteer.launch(options);
+  if (!browser) {
+    browser = await puppeteer.launch(options);
+  }
   return browser;
 };
 
 // much of this function comes from the npm package "pupflare"
 const puppeteerGet = async (url: string) => {
-  await new Promise((resolve, reject) =>
-    setTimeout(() => {
-      resolve(true);
-    }, Math.random() * 2000 + 1000)
-  );
+  // await new Promise((resolve, reject) =>
+  //   setTimeout(() => {
+  //     resolve(true);
+  //   }, Math.random() * 2000 + 1000)
+  // );
   const currBrowser = await getPuppeteerClient();
   url = BASE_URL + url;
   console.log("Scraping", url);
   let responseBody;
   let responseData;
   let responseHeaders;
+  let responseUrl;
+
   const page = await currBrowser.newPage();
   // if (request.method == "POST") {
   //   await page.removeAllListeners("request");
@@ -76,7 +67,7 @@ const puppeteerGet = async (url: string) => {
     ],
   });
 
-  await client.on("Network.requestIntercepted", async (e) => {
+  client.on("Network.requestIntercepted", async (e) => {
     let obj = { interceptionId: e.interceptionId };
     if (e.isDownload) {
       await client
@@ -97,23 +88,62 @@ const puppeteerGet = async (url: string) => {
   try {
     let response;
     let tryCount = 0;
+
     response = await page.goto(url, {
       timeout: 30000,
       waitUntil: "domcontentloaded",
     });
+    // page.setCookie({
+    //   name: "cf_clearance",
+    //   value: "mGQe6AFrg1XCiklUAfJPY9KeZMY7YbsIQwoMD.u9vUQ-1670619282-0-150",
+    //   domain: ".hltv.org",
+    //   path: "/",
+    //   expires: 1702155282.820663,
+    //   // size: 72,
+    //   httpOnly: true,
+    //   secure: true,
+    //   // session: false,
+    //   sameSite: "None",
+    //   sameParty: false,
+    //   sourceScheme: "Secure",
+    //   sourcePort: 443,
+    // });
+    // page.setCookie({
+    //   name: "cf_chl_2",
+    //   value: "f99bfdac701c597",
+    //   domain: "www.hltv.org",
+    //   path: "/",
+    //   expires: 1670622879,
+    //   // size: 23,
+    //   httpOnly: false,
+    //   secure: false,
+    //   // session: false,
+    //   sameParty: false,
+    //   sourceScheme: "Secure",
+    //   sourcePort: 443,
+    // });
     responseBody = await response.text();
     responseData = await response.buffer();
-    while (responseBody.includes("challenge-running") && tryCount <= 10) {
+    // console.log(await page.cookies());
+    while (responseBody.includes("challenge-running") && tryCount <= 15) {
+      console.log("trying again", tryCount);
       const newResponse = await page.waitForNavigation({
-        timeout: 30000,
+        timeout: 0,
         waitUntil: "domcontentloaded",
       });
       if (newResponse) response = newResponse;
       responseBody = await response.text();
       responseData = await response.buffer();
+      responseUrl = await response.url();
       tryCount++;
+      await page.screenshot({ path: "cf.png", fullPage: true });
     }
+    // console.log("response no longer running");
     responseHeaders = await response.headers();
+    // if (tryCount > 1) {
+    //   console.log(responseHeaders);
+    // }
+
     // const cookies = await page.cookies();
     // if (cookies)
     //   cookies.forEach((cookie) => {
