@@ -59,6 +59,8 @@ export const mapSchema = new Schema({
   mapType: String,
   score: scoreSchema,
   // If not a tie, teamOne is the winner, teamTwo is the loser
+  teamOneRanking: Number,
+  teamTwoRanking: Number,
   teamOneStats: [playerStatsSchema],
   teamTwoStats: [playerStatsSchema],
 });

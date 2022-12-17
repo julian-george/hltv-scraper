@@ -59,19 +59,6 @@ export const parseMatch = async ($: CheerioAPI, matchId: number) => {
     }
   }
 
-  if (!CACHED)
-    await createMatch({
-      hltvId,
-      title,
-      eventId,
-      date,
-      format,
-      online,
-      matchType,
-    }).catch((err) =>
-      console.error("Unable to add match ID " + hltvId + " to database: ", err)
-    );
-
   const playerLinks = $("div#all-content > table.totalstats")
     .find("td.players > div.flagAlign > a")
     .toArray()
@@ -81,22 +68,34 @@ export const parseMatch = async ($: CheerioAPI, matchId: number) => {
     const playerId = Number(playerUrl.split("/")[2]);
     const player = await getPlayerByHltvId(playerId);
     if (CACHED) {
-      await parsePlayer(
-        load(fs.readFileSync("cached/player-page.html")),
-        playerId
-      );
+      parsePlayer(load(fs.readFileSync("cached/player-page.html")), playerId);
     } else {
       if (!player) {
-        const playerPage = await puppeteerGet(playerUrl);
-        if (!fs.existsSync("cached/player-page.html")) {
-          fs.writeFile("cached/player-page.html", playerPage, (err) => {
-            if (err) throw err;
-          });
-        }
-        await parsePlayer(load(playerPage), playerId);
+        puppeteerGet(playerUrl).then((playerPage) => {
+          if (!fs.existsSync("cached/player-page.html")) {
+            fs.writeFile("cached/player-page.html", playerPage, (err) => {
+              if (err) throw err;
+            });
+          }
+          parsePlayer(load(playerPage), playerId);
+        });
       }
     }
   }
+  const rankings = {
+    firstTeam:
+      Number(
+        $($("div.teamRanking > a")[0])
+          .text()
+          .replace(/[^0-9\.-]+/g, "")
+      ) || null,
+    secondTeam:
+      Number(
+        $($("div.teamRanking > a")[1])
+          .text()
+          .replace(/[^0-9\.-]+/g, "")
+      ) || null,
+  };
   let mapLinks = $(
     "div.mapholder > div > div.results-center > div.results-center-stats > a"
   ).toArray();
@@ -133,7 +132,8 @@ export const parseMatch = async ($: CheerioAPI, matchId: number) => {
       await parseMap(
         load(fs.readFileSync("cached/map-page.html")),
         mapId,
-        matchId
+        matchId,
+        rankings
       );
     } else {
       if (map) {
@@ -146,16 +146,40 @@ export const parseMatch = async ($: CheerioAPI, matchId: number) => {
           if (err) throw err;
         });
       }
-      await parseMap(load(mapPage), mapId, matchId);
+      await parseMap(load(mapPage), mapId, matchId, rankings);
     }
   }
+  if (!CACHED)
+    await createMatch({
+      hltvId,
+      title,
+      eventId,
+      date,
+      format,
+      online,
+      matchType,
+    })
+      .then((match) => {
+        return match;
+      })
+      .catch((err) =>
+        console.error(
+          "Unable to add match ID " + hltvId + " to database: ",
+          err
+        )
+      );
 };
 
 const parseMatchStats = async ($: CheerioAPI) => {
   return $(".columns > .stats-match-map.inactive").toArray();
 };
 
-const parseMap = async ($: CheerioAPI, mapId: number, matchId: number) => {
+const parseMap = async (
+  $: CheerioAPI,
+  mapId: number,
+  matchId: number,
+  rankings: { firstTeam: number | null; secondTeam: number | null }
+) => {
   const hltvId = mapId;
   let mapType = null;
   try {
@@ -185,15 +209,21 @@ const parseMap = async ($: CheerioAPI, mapId: number, matchId: number) => {
     }
   }
   score = {};
+  let teamOneRanking = null;
+  let teamTwoRanking = null;
   const firstWon =
     Number($(scoreContainer.childNodes[0]).text()) >=
     Number($(scoreContainer.childNodes[2]).text());
   if (firstWon) {
     score["teamOne"] = firstTeam;
     score["teamTwo"] = secondTeam;
+    teamOneRanking = rankings.firstTeam;
+    teamTwoRanking = rankings.secondTeam;
   } else {
     score["teamOne"] = secondTeam;
     score["teamTwo"] = firstTeam;
+    teamOneRanking = rankings.secondTeam;
+    teamTwoRanking = rankings.firstTeam;
   }
   const mapPerformanceLink = $(
     ".stats-top-menu-item-link:contains('Performance')"
@@ -208,15 +238,19 @@ const parseMap = async ($: CheerioAPI, mapId: number, matchId: number) => {
       load(fs.readFileSync("cached/map-performance-page.html"))
     ));
   } else {
-    const mapPage = await puppeteerGet(mapPerformanceUrl);
+    const mapPerformancePage = await puppeteerGet(mapPerformanceUrl, true);
     if (!fs.existsSync("cached/map-performance-page.html")) {
-      fs.writeFile("cached/map-performance-page.html", mapPage, (err) => {
-        if (err) throw err;
-      });
+      fs.writeFile(
+        "cached/map-performance-page.html",
+        mapPerformancePage,
+        (err) => {
+          if (err) throw err;
+        }
+      );
     }
     // console.log(mapPage);
     ({ firstTeamStats, secondTeamStats } = await parseMapPerformance(
-      load(mapPage)
+      load(mapPerformancePage)
     ));
   }
   const tStatRows = $("table.tstats > tbody > tr").toArray();
@@ -283,11 +317,17 @@ const parseMap = async ($: CheerioAPI, mapId: number, matchId: number) => {
       matchId,
       mapType,
       score,
+      teamOneRanking,
+      teamTwoRanking,
       teamOneStats,
       teamTwoStats,
-    }).catch((err) =>
-      console.error("Unable to add map ID " + hltvId + " to database: ", err)
-    );
+    })
+      .then((map) => {
+        return map;
+      })
+      .catch((err) =>
+        console.error("Unable to add map ID " + hltvId + " to database: ", err)
+      );
 };
 
 const parseMapPerformance = async ($: CheerioAPI) => {
@@ -430,9 +470,16 @@ const parseEvent = async ($: CheerioAPI, eventId: number) => {
       online,
       format,
       teamRankings,
-    }).catch((err) =>
-      console.error("Unable to add event ID " + hltvId + " to database: ", err)
-    );
+    })
+      .then((event) => {
+        return event;
+      })
+      .catch((err) =>
+        console.error(
+          "Unable to add event ID " + hltvId + " to database: ",
+          err
+        )
+      );
 };
 
 const parsePlayer = async ($: CheerioAPI, playerId: number) => {
@@ -453,7 +500,10 @@ const parsePlayer = async ($: CheerioAPI, playerId: number) => {
       currentAge = $("b:contains('Age')").next("span").text();
     birthYear =
       currentAge != ""
-        ? currentYear - Number(currentAge.replace(/[^0-9\.-]+/g, ""))
+        ? // this checks if the player has passed away
+          currentAge.includes("-")
+          ? Number(currentAge.split("(")[1].split("-")[0])
+          : currentYear - Number(currentAge.replace(/[^0-9\.-]+/g, ""))
         : null;
   } catch {}
   let nationality = null;
@@ -463,9 +513,16 @@ const parsePlayer = async ($: CheerioAPI, playerId: number) => {
       nationality = $($(".player-realname > .flag")[0]).attr("title");
   } catch {}
   if (!CACHED)
-    await createPlayer({ hltvId, name, birthYear, nationality }).catch((err) =>
-      console.error("Unable to add player ID " + hltvId + " to database: ", err)
-    );
+    await createPlayer({ hltvId, name, birthYear, nationality })
+      .then((player) => {
+        return player;
+      })
+      .catch((err) =>
+        console.error(
+          "Unable to add player ID " + hltvId + " to database: ",
+          err
+        )
+      );
 };
 
 export const parseResults = async ($: CheerioAPI) => {

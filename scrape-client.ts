@@ -22,21 +22,29 @@ let options = {
 };
 if (process.env.HEADFUL) options.headless = false;
 let browser: Browser | null = null;
-export const getPuppeteerClient = async () => {
-  if (!browser) {
-    browser = await puppeteer.launch(options);
+let headfulBrowser: Browser | null = null;
+export const getPuppeteerClient = async (headful: boolean = false) => {
+  if (!headful) {
+    if (!browser) {
+      browser = await puppeteer.launch(options);
+    }
+    return browser;
+  } else {
+    if (!headfulBrowser) {
+      headfulBrowser = await puppeteer.launch({ ...options, headless: false });
+    }
+    return headfulBrowser;
   }
-  return browser;
 };
 
 // much of this function comes from the npm package "pupflare"
-const puppeteerGet = async (url: string) => {
+const puppeteerGet = async (url: string, headful?: boolean) => {
   // await new Promise((resolve, reject) =>
   //   setTimeout(() => {
   //     resolve(true);
   //   }, Math.random() * 2000 + 1000)
   // );
-  const currBrowser = await getPuppeteerClient();
+  const currBrowser = await getPuppeteerClient(headful);
   url = BASE_URL + url;
   console.log("Scraping", url);
   let responseBody;
@@ -93,40 +101,10 @@ const puppeteerGet = async (url: string) => {
       timeout: 30000,
       waitUntil: "domcontentloaded",
     });
-    // page.setCookie({
-    //   name: "cf_clearance",
-    //   value: "mGQe6AFrg1XCiklUAfJPY9KeZMY7YbsIQwoMD.u9vUQ-1670619282-0-150",
-    //   domain: ".hltv.org",
-    //   path: "/",
-    //   expires: 1702155282.820663,
-    //   // size: 72,
-    //   httpOnly: true,
-    //   secure: true,
-    //   // session: false,
-    //   sameSite: "None",
-    //   sameParty: false,
-    //   sourceScheme: "Secure",
-    //   sourcePort: 443,
-    // });
-    // page.setCookie({
-    //   name: "cf_chl_2",
-    //   value: "f99bfdac701c597",
-    //   domain: "www.hltv.org",
-    //   path: "/",
-    //   expires: 1670622879,
-    //   // size: 23,
-    //   httpOnly: false,
-    //   secure: false,
-    //   // session: false,
-    //   sameParty: false,
-    //   sourceScheme: "Secure",
-    //   sourcePort: 443,
-    // });
+
     responseBody = await response.text();
     responseData = await response.buffer();
-    // console.log(await page.cookies());
     while (responseBody.includes("challenge-running") && tryCount <= 15) {
-      console.log("trying again", tryCount);
       const newResponse = await page.waitForNavigation({
         timeout: 0,
         waitUntil: "domcontentloaded",
@@ -136,20 +114,10 @@ const puppeteerGet = async (url: string) => {
       responseData = await response.buffer();
       responseUrl = await response.url();
       tryCount++;
-      await page.screenshot({ path: "cf.png", fullPage: true });
+      // await page.screenshot({ path: "cf.png", fullPage: true });
     }
-    // console.log("response no longer running");
+    if (tryCount > 0) console.log(`Beat challenge after ${tryCount} tries`);
     responseHeaders = await response.headers();
-    // if (tryCount > 1) {
-    //   console.log(responseHeaders);
-    // }
-
-    // const cookies = await page.cookies();
-    // if (cookies)
-    //   cookies.forEach((cookie) => {
-    //     const { name, value, secure, expires, domain, ...options } = cookie;
-    //     ctx.cookies.set(cookie.name, cookie.value, options);
-    //   });
   } catch (error) {
     console.error(error);
     if (!error.toString().includes("ERR_BLOCKED_BY_CLIENT")) {
