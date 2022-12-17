@@ -22,7 +22,7 @@ mongoose
   });
 
 if (process.env.CACHED) {
-  parseResults(load(fs.readFileSync("cached/results-browser.html")));
+  // parseResults(load(fs.readFileSync("cached/results-browser.html")));
 } else {
   scrapeClient(`/results?offset=${RESULT_OFFSET}`).then((resultsPage) => {
     // if (!fs.existsSync("cached/results-browser.html")) {
