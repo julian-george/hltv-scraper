@@ -9,7 +9,7 @@ import puppeteerGet from "./scrape-client";
 
 dotenv.config();
 
-const CACHED = !!process.env.CACHED;
+const CACHED = !!process.env.SCRAPE_CACHED;
 const ABORT_UPON_DUPLICATE = process?.env?.ABORT_UPON_DUPLICATE || 0;
 const RESULT_LIMIT = Infinity;
 const PLAYER_LIMIT = Infinity;
