@@ -68,17 +68,19 @@ export const parseMatch = async ($: CheerioAPI, matchId: number) => {
     const playerId = Number(playerUrl.split("/")[2]);
     const player = await getPlayerByHltvId(playerId);
     if (CACHED) {
-      parsePlayer(load(fs.readFileSync("cached/player-page.html")), playerId);
+      await parsePlayer(
+        load(fs.readFileSync("cached/player-page.html")),
+        playerId
+      );
     } else {
       if (!player) {
-        puppeteerGet(playerUrl).then((playerPage) => {
-          if (!fs.existsSync("cached/player-page.html")) {
-            fs.writeFile("cached/player-page.html", playerPage, (err) => {
-              if (err) throw err;
-            });
-          }
-          parsePlayer(load(playerPage), playerId);
-        });
+        const playerPage = await puppeteerGet(playerUrl);
+        if (!fs.existsSync("cached/player-page.html")) {
+          fs.writeFile("cached/player-page.html", playerPage, (err) => {
+            if (err) throw err;
+          });
+        }
+        await parsePlayer(load(playerPage), playerId);
       }
     }
   }
