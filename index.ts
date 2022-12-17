@@ -22,15 +22,14 @@ mongoose
   });
 
 if (process.env.CACHED) {
-  console.log("cached env true");
   parseResults(load(fs.readFileSync("cached/results-browser.html")));
 } else {
   scrapeClient(`/results?offset=${RESULT_OFFSET}`).then((resultsPage) => {
-    if (!fs.existsSync("cached/results-browser.html")) {
-      fs.writeFile("cached/results-browser.html", resultsPage, (err) => {
-        if (err) throw err;
-      });
-    }
+    // if (!fs.existsSync("cached/results-browser.html")) {
+    //   fs.writeFile("cached/results-browser.html", resultsPage, (err) => {
+    //     if (err) throw err;
+    //   });
+    // }
     parseResults(load(resultsPage));
   });
 }
