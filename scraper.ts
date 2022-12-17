@@ -13,7 +13,7 @@ const CACHED = !!process.env.SCRAPE_CACHED;
 const ABORT_UPON_DUPLICATE = process?.env?.ABORT_UPON_DUPLICATE || 0;
 const RESULT_LIMIT = Infinity;
 const PLAYER_LIMIT = Infinity;
-
+console.log("cached", CACHED);
 export const parseMatch = async ($: CheerioAPI, matchId: number) => {
   const hltvId = matchId;
   let title = null;
