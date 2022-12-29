@@ -34,6 +34,6 @@ if (process.env.SCRAPE_CACHED) {
       parseResults(load(resultsPage));
     })
     .catch((err) => {
-      console.error(err);
+      console.error(err.message);
     });
 }
