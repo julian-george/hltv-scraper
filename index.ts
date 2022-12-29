@@ -3,6 +3,7 @@ import fs from "fs";
 import { load } from "cheerio";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
+import express from "express";
 import { parseResults } from "./scraper";
 import scrapeClient from "./scrape-client";
 
@@ -22,14 +23,9 @@ mongoose
   });
 
 if (process.env.DISABLE_SCRAPING) {
-  const idlePromise = new Promise(async (resolve, reject) => {
-    console.log("Scraping disabled");
-    setTimeout(() => {
-      resolve(true);
-    }, 1000000000);
-  });
-  idlePromise.then(() => {
-    console.log("Byebye");
+  const app = express();
+  app.listen(process.env.PORT, () => {
+    console.log("listening");
   });
 } else {
   if (process.env.SCRAPE_CACHED) {
