@@ -22,10 +22,11 @@ mongoose
   });
 
 if (process.env.DISABLE_SCRAPING) {
-  const idlePromise = new Promise((resolve, reject) => {
+  const idlePromise = new Promise(async (resolve, reject) => {
+    console.log("Scraping disabled");
     setTimeout(() => {
       resolve(true);
-    }, 100000000000);
+    }, 1000000000);
   });
   idlePromise.then(() => {
     console.log("Byebye");
