@@ -44,6 +44,7 @@ const puppeteerGet = async (url: string, headful?: boolean) => {
   //     resolve(true);
   //   }, Math.random() * 2000 + 1000)
   // );
+  if (process.env.FORCE_HEADLESS) headful = false;
   const currBrowser = await getPuppeteerClient(headful);
   url = BASE_URL + url;
   console.log("Scraping", url);
@@ -114,7 +115,7 @@ const puppeteerGet = async (url: string, headful?: boolean) => {
       responseData = await response.buffer();
       responseUrl = await response.url();
       tryCount++;
-      // await page.screenshot({ path: "cf.png", fullPage: true });
+      await page.screenshot({ path: "cf.png", fullPage: true });
     }
     if (tryCount > 0) console.log(`Beat challenge after ${tryCount} tries`);
     responseHeaders = await response.headers();
