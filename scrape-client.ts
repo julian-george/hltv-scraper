@@ -26,12 +26,25 @@ let headfulBrowser: Browser | null = null;
 export const getPuppeteerClient = async (headful: boolean = false) => {
   if (!headful) {
     if (!browser) {
-      browser = await puppeteer.launch(options);
+      try {
+        browser = await puppeteer.launch(options);
+      } catch (err) {
+        console.error("Error while getting headless client", err);
+        return null;
+      }
     }
     return browser;
   } else {
     if (!headfulBrowser) {
-      headfulBrowser = await puppeteer.launch({ ...options, headless: false });
+      try {
+        headfulBrowser = await puppeteer.launch({
+          ...options,
+          headless: false,
+        });
+      } catch (err) {
+        console.error("Error while getting headful client", err);
+        return null;
+      }
     }
     return headfulBrowser;
   }
@@ -46,6 +59,7 @@ const puppeteerGet = async (url: string, headful?: boolean) => {
   // );
   if (process.env.FORCE_HEADLESS) headful = false;
   const currBrowser = await getPuppeteerClient(headful);
+  if (!currBrowser) return;
   url = BASE_URL + url;
   console.log("Scraping", url);
   let responseBody;
