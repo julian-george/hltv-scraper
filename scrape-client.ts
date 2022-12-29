@@ -26,25 +26,15 @@ let headfulBrowser: Browser | null = null;
 export const getPuppeteerClient = async (headful: boolean = false) => {
   if (!headful) {
     if (!browser) {
-      try {
-        browser = await puppeteer.launch(options);
-      } catch (err) {
-        console.error("Error while getting headless client", err);
-        return null;
-      }
+      browser = await puppeteer.launch(options);
     }
     return browser;
   } else {
     if (!headfulBrowser) {
-      try {
-        headfulBrowser = await puppeteer.launch({
-          ...options,
-          headless: false,
-        });
-      } catch (err) {
-        console.error("Error while getting headful client", err);
-        return null;
-      }
+      headfulBrowser = await puppeteer.launch({
+        ...options,
+        headless: false,
+      });
     }
     return headfulBrowser;
   }
