@@ -1,1 +1,1 @@
-web: npm start
+web:  Xvfb :19 -screen 0 1024x768x16 && npm start
