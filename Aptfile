@@ -6,4 +6,5 @@ xfonts-100dpi
 xfonts-75dpi
 xfonts-scalable 
 xfonts-cyrillic
+xf86-input-evdev
 x11-apps
