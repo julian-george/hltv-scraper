@@ -1,1 +1,1 @@
-web:  Xvfb :19 -screen 0 1024x768x16 -ac -nolisten tcp -nolisten unix && npm start
+web:  xvfb-run --server-args="-screen 0 1024x768x24 -ac -nolisten tcp -nolisten unix" ico -faces && npm start
