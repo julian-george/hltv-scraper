@@ -10,3 +10,12 @@ xinput
 x11-apps
 libsm6
 libxt6
+libice6
+libxaw
+libxext
+libxft
+libxmu
+libxrender
+libxt
+xorg-util-macros
+libx11
