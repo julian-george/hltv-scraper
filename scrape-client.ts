@@ -119,7 +119,7 @@ const puppeteerGet = async (url: string, headful?: boolean) => {
       responseUrl = await response.url();
       tryCount++;
       if (tryCount > 0) console.log(`try number ${tryCount}`);
-      await page.screenshot({ path: "cf.png", fullPage: true });
+      // await page.screenshot({ path: "cf.png", fullPage: true });
     }
     // if (tryCount > 0) console.log(`Beat challenge after ${tryCount} tries`);
     responseHeaders = await response.headers();
