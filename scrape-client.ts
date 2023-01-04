@@ -1,7 +1,11 @@
+import fs from "fs";
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import dotenv from "dotenv";
 import { Browser } from "puppeteer";
+import { anonymizeProxy } from "proxy-chain";
+
+const NUM_HEADFUL = 5;
 
 puppeteer.use(StealthPlugin());
 dotenv.config();
@@ -16,29 +20,53 @@ const responseHeadersToRemove = [
 ];
 
 const BASE_URL = "https://www.hltv.org";
-let options = {
-  headless: true,
-  args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
-};
-if (process.env.HEADFUL) options.headless = false;
+
+// if (process.env.HEADFUL) options.headless = false;
 let browser: Browser | null = null;
 let headfulBrowser: Browser | null = null;
-export const getPuppeteerClient = async (headful: boolean = false) => {
-  if (!headful) {
-    if (!browser) {
-      browser = await puppeteer.launch(options);
-    }
-    return browser;
-  } else {
-    if (!headfulBrowser) {
-      headfulBrowser = await puppeteer.launch({
-        ...options,
-        headless: false,
-      });
-    }
-    return headfulBrowser;
+let ips: string[] = fs
+  .readFileSync("ips.txt", { encoding: "utf8" })
+  .split("\n");
+let availableHeadlessBrowsers: Browser[] = [];
+let availableHeadfulBrowsers: Browser[] = [];
+
+(async () => {
+  for (let i = 0; i < ips.length; i++) {
+    const isHeadless = i >= NUM_HEADFUL;
+    const proxyString = `--proxy-server=${await anonymizeProxy(
+      "http://" + ips[i]
+    )}`;
+    const newBrowser = await puppeteer.launch({
+      headless: isHeadless,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-gpu",
+        proxyString,
+      ],
+    });
+    (isHeadless ? availableHeadlessBrowsers : availableHeadfulBrowsers).push(
+      newBrowser
+    );
   }
-};
+})();
+
+// export const getPuppeteerClient = async (headful: boolean = false) => {
+//   if (!headful) {
+//     if (!browser) {
+//       browser = await puppeteer.launch(options);
+//     }
+//     return browser;
+//   } else {
+//     if (!headfulBrowser) {
+//       headfulBrowser = await puppeteer.launch({
+//         ...options,
+//         headless: false,
+//       });
+//     }
+//     return headfulBrowser;
+//   }
+// };
 
 // much of this function comes from the npm package "pupflare"
 const puppeteerGet = async (url: string, headful?: boolean) => {
@@ -48,7 +76,21 @@ const puppeteerGet = async (url: string, headful?: boolean) => {
   //   }, Math.random() * 2000 + 1000)
   // );
   if (process.env.FORCE_HEADLESS) headful = false;
-  const currBrowser = await getPuppeteerClient(headful);
+  while (
+    (headful ? availableHeadfulBrowsers : availableHeadlessBrowsers).length == 0
+  ) {
+    const waitPromise = new Promise((resolve) => {
+      setTimeout(() => {
+        // console.log("no browsers available, waiting");
+        resolve(true);
+      }, 5000);
+    });
+    await waitPromise;
+  }
+
+  const currBrowser = (
+    headful ? availableHeadfulBrowsers : availableHeadlessBrowsers
+  ).shift();
   if (!currBrowser) return;
   url = BASE_URL + url;
   console.log("Scraping", url);
@@ -131,6 +173,9 @@ const puppeteerGet = async (url: string, headful?: boolean) => {
   }
   await page.close();
   responseHeadersToRemove.forEach((header) => delete responseHeaders[header]);
+  (headful ? availableHeadfulBrowsers : availableHeadlessBrowsers).push(
+    currBrowser
+  );
   return responseBody;
 };
 
