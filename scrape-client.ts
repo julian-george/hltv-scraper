@@ -108,19 +108,19 @@ const puppeteerGet = async (url: string, headful?: boolean) => {
     });
     responseBody = await response.text();
     responseData = await response.buffer();
-    // while (responseBody.includes("challenge-running") && tryCount <= 15) {
-    //   const newResponse = await page.waitForNavigation({
-    //     timeout: 0,
-    //     waitUntil: "domcontentloaded",
-    //   });
-    //   if (newResponse) response = newResponse;
-    //   responseBody = await response.text();
-    //   responseData = await response.buffer();
-    //   responseUrl = await response.url();
-    //   tryCount++;
-    //   if (tryCount > 0) console.log(`try number ${tryCount}`);
-    //   // await page.screenshot({ path: "cf.png", fullPage: true });
-    // }
+    while (responseBody.includes("challenge-running") && tryCount <= 15) {
+      const newResponse = await page.waitForNavigation({
+        timeout: 0,
+        waitUntil: "domcontentloaded",
+      });
+      if (newResponse) response = newResponse;
+      responseBody = await response.text();
+      responseData = await response.buffer();
+      responseUrl = await response.url();
+      tryCount++;
+      if (tryCount > 0) console.log(`try number ${tryCount}`);
+      // await page.screenshot({ path: "cf.png", fullPage: true });
+    }
     // if (tryCount > 0) console.log(`Beat challenge after ${tryCount} tries`);
     responseHeaders = await response.headers();
   } catch (error) {
