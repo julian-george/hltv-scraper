@@ -15,6 +15,7 @@ const RESULT_LIMIT = Infinity;
 const PLAYER_LIMIT = Infinity;
 
 export const parseMatch = async ($: CheerioAPI, matchId: number) => {
+  const startTime = Date.now();
   const hltvId = matchId;
   let title = null;
   try {
@@ -63,6 +64,7 @@ export const parseMatch = async ($: CheerioAPI, matchId: number) => {
     .find("td.players > div.flagAlign > a")
     .toArray()
     .slice(0, CACHED ? 1 : PLAYER_LIMIT);
+  const playersStartTime = Date.now();
   for (const playerLink of playerLinks) {
     const playerUrl = playerLink.attribs["href"];
     const playerId = Number(playerUrl.split("/")[2]);
@@ -84,6 +86,10 @@ export const parseMatch = async ($: CheerioAPI, matchId: number) => {
       }
     }
   }
+  const playersEndTime = Date.now();
+  const playersElapsedTime =
+    Math.round((playersEndTime - playersStartTime) / 10) / 100;
+  console.log(`Players for Math ${matchId}: ${playersElapsedTime} seconds`);
   const rankings = {
     firstTeam:
       Number(
@@ -170,6 +176,9 @@ export const parseMatch = async ($: CheerioAPI, matchId: number) => {
           err
         )
       );
+  const endTime = Date.now();
+  const elapsedTime = Math.round((endTime - startTime) / 10) / 100;
+  console.log(`Match ${matchId}: ${elapsedTime} seconds`);
 };
 
 const parseMatchStats = async ($: CheerioAPI) => {
@@ -235,6 +244,7 @@ const parseMap = async (
   let firstTeamStats = null;
   let secondTeamStats = null;
   const mapPerformanceUrl = mapPerformanceLink.attribs["href"];
+  const perfPageStartTime = Date.now();
   if (CACHED) {
     ({ firstTeamStats, secondTeamStats } = await parseMapPerformance(
       load(fs.readFileSync("cached/map-performance-page.html"))
@@ -250,7 +260,6 @@ const parseMap = async (
         }
       );
     }
-    // console.log(mapPage);
     ({ firstTeamStats, secondTeamStats } = await parseMapPerformance(
       load(mapPerformancePage)
     ));
@@ -313,6 +322,10 @@ const parseMap = async (
       hltvId,
     });
   }
+  const perfPageEndTime = Date.now();
+  const perfPageElapsedTime =
+    Math.round((perfPageEndTime - perfPageStartTime) / 10) / 100;
+  console.log(`Map ${mapId}: ${perfPageElapsedTime} seconds`);
   if (!CACHED)
     createMap({
       hltvId: Number(hltvId),

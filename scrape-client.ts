@@ -106,7 +106,6 @@ const puppeteerGet = async (url: string, headful?: boolean) => {
       timeout: 30000,
       waitUntil: "domcontentloaded",
     });
-
     responseBody = await response.text();
     responseData = await response.buffer();
     while (responseBody.includes("challenge-running") && tryCount <= 15) {
@@ -119,9 +118,9 @@ const puppeteerGet = async (url: string, headful?: boolean) => {
       responseData = await response.buffer();
       responseUrl = await response.url();
       tryCount++;
-      await page.screenshot({ path: "cf.png", fullPage: true });
+      // await page.screenshot({ path: "cf.png", fullPage: true });
     }
-    if (tryCount > 0) console.log(`Beat challenge after ${tryCount} tries`);
+    // if (tryCount > 0) console.log(`Beat challenge after ${tryCount} tries`);
     responseHeaders = await response.headers();
   } catch (error) {
     console.error(error);
@@ -129,7 +128,6 @@ const puppeteerGet = async (url: string, headful?: boolean) => {
       console.error("Error sending request: ", error);
     }
   }
-
   await page.close();
   responseHeadersToRemove.forEach((header) => delete responseHeaders[header]);
   return responseBody;
