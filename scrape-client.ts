@@ -4,11 +4,11 @@ import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import dotenv from "dotenv";
 import { Browser } from "puppeteer";
 import { anonymizeProxy } from "proxy-chain";
-
-const NUM_HEADFUL = 5;
-
 puppeteer.use(StealthPlugin());
 dotenv.config();
+
+const NUM_HEADFUL = Number(process.env.NUM_HEADFUL);
+const MAX_CHALLENGE_TRIES = 8;
 
 const responseHeadersToRemove = [
   "Accept-Ranges",
@@ -22,11 +22,10 @@ const responseHeadersToRemove = [
 const BASE_URL = "https://www.hltv.org";
 
 // if (process.env.HEADFUL) options.headless = false;
-let browser: Browser | null = null;
-let headfulBrowser: Browser | null = null;
 let ips: string[] = fs
   .readFileSync("ips.txt", { encoding: "utf8" })
-  .split("\n");
+  .split("\n")
+  .slice(0, Number(process.env.BROWSER_LIMIT));
 let availableHeadlessBrowsers: Browser[] = [];
 let availableHeadfulBrowsers: Browser[] = [];
 
@@ -34,7 +33,7 @@ let availableHeadfulBrowsers: Browser[] = [];
   for (let i = 0; i < ips.length; i++) {
     const isHeadless = i >= NUM_HEADFUL;
     const proxyString = `--proxy-server=${await anonymizeProxy(
-      "http://" + ips[i]
+      "http://" + ips[0]
     )}`;
     const newBrowser = await puppeteer.launch({
       headless: isHeadless,
@@ -69,7 +68,7 @@ let availableHeadfulBrowsers: Browser[] = [];
 // };
 
 // much of this function comes from the npm package "pupflare"
-const puppeteerGet = async (url: string, headful?: boolean) => {
+const puppeteerGet = async (url: string, headful: boolean = true) => {
   // await new Promise((resolve, reject) =>
   //   setTimeout(() => {
   //     resolve(true);
@@ -81,7 +80,7 @@ const puppeteerGet = async (url: string, headful?: boolean) => {
   ) {
     const waitPromise = new Promise((resolve) => {
       setTimeout(() => {
-        // console.log("no browsers available, waiting");
+        // console.log("no browsers available for url", url, "waiting");
         resolve(true);
       }, 5000);
     });
@@ -150,7 +149,10 @@ const puppeteerGet = async (url: string, headful?: boolean) => {
     });
     responseBody = await response.text();
     responseData = await response.buffer();
-    while (responseBody.includes("challenge-running") && tryCount <= 15) {
+    while (
+      responseBody.includes("challenge-running") &&
+      tryCount < MAX_CHALLENGE_TRIES
+    ) {
       const newResponse = await page.waitForNavigation({
         timeout: 0,
         waitUntil: "domcontentloaded",
@@ -160,8 +162,14 @@ const puppeteerGet = async (url: string, headful?: boolean) => {
       responseData = await response.buffer();
       responseUrl = await response.url();
       tryCount++;
-      if (tryCount > 0) console.log(`try number ${tryCount}`);
+      // if (tryCount > 0) console.log(`try number ${tryCount}`);
       // await page.screenshot({ path: "cf.png", fullPage: true });
+    }
+    if (tryCount == MAX_CHALLENGE_TRIES && headful != true) {
+      console.log(
+        `Headless scraping failed for URL ${url}, trying headful scraping.`
+      );
+      return await puppeteerGet(url.replace("https://www.hltv.org", ""), true);
     }
     // if (tryCount > 0) console.log(`Beat challenge after ${tryCount} tries`);
     responseHeaders = await response.headers();
