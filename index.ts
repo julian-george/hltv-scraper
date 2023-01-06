@@ -1,40 +1,36 @@
-import axios from "axios";
 import fs from "fs";
 import { load } from "cheerio";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-import express from "express";
 import { parseResults } from "./scraper";
-import scrapeClient from "./scrape-client";
+import puppeteerGet from "./scrape-client";
 
 dotenv.config();
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const RESULT_OFFSET = process.env.RESULT_OFFSET || 0;
+const CACHED = !!process.env.SCRAPE_CACHED;
 
-mongoose
-  .connect(MONGODB_URI)
-  .then(() => {
-    console.log("Connected to MongoDB");
-  })
-  .catch((err) => {
-    console.error("Failed to connect to MongoDB", err);
-    throw err;
-  });
-
-if (process.env.SCRAPE_CACHED) {
-  parseResults(load(fs.readFileSync("cached/results-browser.html")));
-} else {
-  scrapeClient(`/results?offset=${RESULT_OFFSET}`, true)
-    .then((resultsPage) => {
-      if (!fs.existsSync("cached/results-browser.html")) {
-        fs.writeFile("cached/results-browser.html", resultsPage, (err) => {
-          if (err) throw err;
-        });
-      }
-      parseResults(load(resultsPage));
+(async () => {
+  await mongoose
+    .connect(MONGODB_URI)
+    .then(() => {
+      console.log("Connected to MongoDB");
     })
     .catch((err) => {
-      console.error(err.message);
+      console.error("Failed to connect to MongoDB", err);
+      throw err;
     });
-}
+  const initialResultUrl = !CACHED
+    ? `/results?offset=${RESULT_OFFSET}`
+    : "cached/results-browser.html";
+  const resultsPage = !CACHED
+    ? await puppeteerGet(initialResultUrl, true)
+    : fs.readFileSync("cached/results-browser.html");
+  if (!fs.existsSync("cached/results-browser.html")) {
+    fs.writeFile("cached/results-browser.html", resultsPage, (err) => {
+      if (err) throw err;
+    });
+  }
+  await parseResults(load(resultsPage), initialResultUrl);
+})();

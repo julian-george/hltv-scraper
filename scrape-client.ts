@@ -4,11 +4,20 @@ import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import dotenv from "dotenv";
 import { Browser } from "puppeteer";
 import { anonymizeProxy } from "proxy-chain";
-puppeteer.use(StealthPlugin());
-dotenv.config();
+import { shuffle } from "lodash";
+import events from "events";
 
+dotenv.config();
 const NUM_HEADFUL = Number(process.env.NUM_HEADFUL);
-const MAX_CHALLENGE_TRIES = 8;
+const MAX_CHALLENGE_TRIES = Number(process.env.MAX_CHALLENGE_TRIES);
+const BROWSER_LIMIT = Number(process.env.BROWSER_LIMIT) || 1;
+const FORCE_HEADFUL = process.env.FORCE_HEADFUL;
+const FORCE_HEADLESS = process.env.FORCE_HEADFUL;
+const SCRAPE_DELAY = Number(process.env.SCRAPE_DELAY) || 0;
+
+events.EventEmitter.defaultMaxListeners = BROWSER_LIMIT + 5;
+
+puppeteer.use(StealthPlugin());
 
 const responseHeadersToRemove = [
   "Accept-Ranges",
@@ -21,66 +30,59 @@ const responseHeadersToRemove = [
 
 const BASE_URL = "https://www.hltv.org";
 
-// if (process.env.HEADFUL) options.headless = false;
-let ips: string[] = fs
-  .readFileSync("ips.txt", { encoding: "utf8" })
-  .split("\n")
-  .slice(0, Number(process.env.BROWSER_LIMIT));
+let ips: string[] = shuffle(
+  fs.readFileSync("ips.txt", { encoding: "utf8" }).split("\n")
+).slice(0, BROWSER_LIMIT);
 let availableHeadlessBrowsers: Browser[] = [];
 let availableHeadfulBrowsers: Browser[] = [];
+
+let inProgressUrls: Set<string> = new Set();
+
+let allBrowsersCreated = false;
 
 (async () => {
   for (let i = 0; i < ips.length; i++) {
     const isHeadless = i >= NUM_HEADFUL;
-    const proxyString = `--proxy-server=${await anonymizeProxy(
-      "http://" + ips[0]
-    )}`;
-    const newBrowser = await puppeteer.launch({
-      headless: isHeadless,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-gpu",
-        proxyString,
-      ],
-    });
-    (isHeadless ? availableHeadlessBrowsers : availableHeadfulBrowsers).push(
-      newBrowser
-    );
+    try {
+      const proxyString = `--proxy-server=${await anonymizeProxy(
+        "http://" + ips[i]
+      )}`;
+      const newBrowser = await puppeteer.launch({
+        headless: isHeadless,
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-gpu",
+          proxyString,
+        ],
+      });
+      (isHeadless ? availableHeadlessBrowsers : availableHeadfulBrowsers).push(
+        newBrowser
+      );
+    } catch (err) {
+      console.error(`Unable to create browser ${i} with ip ${ips[i]}`, err);
+    }
   }
+  allBrowsersCreated = true;
 })();
 
-// export const getPuppeteerClient = async (headful: boolean = false) => {
-//   if (!headful) {
-//     if (!browser) {
-//       browser = await puppeteer.launch(options);
-//     }
-//     return browser;
-//   } else {
-//     if (!headfulBrowser) {
-//       headfulBrowser = await puppeteer.launch({
-//         ...options,
-//         headless: false,
-//       });
-//     }
-//     return headfulBrowser;
-//   }
-// };
-
 // much of this function comes from the npm package "pupflare"
-const puppeteerGet = async (url: string, headful: boolean = true) => {
-  // await new Promise((resolve, reject) =>
-  //   setTimeout(() => {
-  //     resolve(true);
-  //   }, Math.random() * 2000 + 1000)
-  // );
-  if (process.env.FORCE_HEADLESS) headful = false;
+const puppeteerGet = async (url: string, headful: boolean = false) => {
+  await new Promise((resolve, reject) =>
+    setTimeout(() => {
+      resolve(true);
+    }, Math.random() * 1000 + SCRAPE_DELAY)
+  );
+  if (inProgressUrls.has(url)) return;
+  if (FORCE_HEADFUL) headful = true;
+  if (FORCE_HEADLESS) headful = false;
   while (
+    !allBrowsersCreated ||
     (headful ? availableHeadfulBrowsers : availableHeadlessBrowsers).length == 0
   ) {
     const waitPromise = new Promise((resolve) => {
       setTimeout(() => {
-        // console.log("no browsers available for url", url, "waiting");
+        console.log("no browsers available for url", url, "waiting");
         resolve(true);
       }, 5000);
     });
@@ -91,8 +93,9 @@ const puppeteerGet = async (url: string, headful: boolean = true) => {
     headful ? availableHeadfulBrowsers : availableHeadlessBrowsers
   ).shift();
   if (!currBrowser) return;
-  url = BASE_URL + url;
-  console.log("Scraping", url);
+  inProgressUrls.add(url);
+  const fullUrl = BASE_URL + url;
+  console.log("Scraping", fullUrl);
   let responseBody;
   let responseData;
   let responseHeaders;
@@ -142,13 +145,24 @@ const puppeteerGet = async (url: string, headful: boolean = true) => {
   try {
     let response;
     let tryCount = 0;
-
-    response = await page.goto(url, {
-      timeout: 30000,
-      waitUntil: "domcontentloaded",
-    });
+    try {
+      response = await page.goto(fullUrl, {
+        timeout: 30000,
+        waitUntil: "domcontentloaded",
+      });
+    } catch (err) {
+      console.error(`Unable to open page ${url}`, err);
+      puppeteerGet(url, headful);
+      throw err;
+    }
     responseBody = await response.text();
     responseData = await response.buffer();
+    if (responseBody.includes("Access Denied")) {
+      console.error(
+        `Browser fetching url ${url} was blocked, removing it from the pool now.`
+      );
+      return await puppeteerGet(url, headful);
+    }
     while (
       responseBody.includes("challenge-running") &&
       tryCount < MAX_CHALLENGE_TRIES
@@ -165,25 +179,31 @@ const puppeteerGet = async (url: string, headful: boolean = true) => {
       // if (tryCount > 0) console.log(`try number ${tryCount}`);
       // await page.screenshot({ path: "cf.png", fullPage: true });
     }
-    if (tryCount == MAX_CHALLENGE_TRIES && headful != true) {
-      console.log(
-        `Headless scraping failed for URL ${url}, trying headful scraping.`
-      );
-      return await puppeteerGet(url.replace("https://www.hltv.org", ""), true);
+    if (tryCount == MAX_CHALLENGE_TRIES) {
+      if (!headful) {
+        console.log(
+          `Headless scraping failed for URL ${url}, trying headful scraping.`
+        );
+        inProgressUrls.delete(url);
+        return await puppeteerGet(url, true);
+      } else {
+        throw new Error(`Unable to beat challenge for url ${url}.`);
+      }
     }
     // if (tryCount > 0) console.log(`Beat challenge after ${tryCount} tries`);
     responseHeaders = await response.headers();
+    responseHeadersToRemove.forEach((header) => delete responseHeaders[header]);
   } catch (error) {
-    console.error(error);
+    console.error(`Error while fetching url ${url}`, error);
     if (!error.toString().includes("ERR_BLOCKED_BY_CLIENT")) {
       console.error("Error sending request: ", error);
     }
   }
   await page.close();
-  responseHeadersToRemove.forEach((header) => delete responseHeaders[header]);
   (headful ? availableHeadfulBrowsers : availableHeadlessBrowsers).push(
     currBrowser
   );
+  inProgressUrls.delete(url);
   return responseBody;
 };
 
