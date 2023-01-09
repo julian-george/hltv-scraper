@@ -11,10 +11,17 @@ dotenv.config();
 
 const CACHED = !!process.env.SCRAPE_CACHED;
 const ABORT_UPON_DUPLICATE = process?.env?.ABORT_UPON_DUPLICATE || 0;
+const SCRAPE_DELAY = Number(process.env.SCRAPE_DELAY) || 0;
+
+// Practically deprecated, maybe useful for testing
 const RESULT_LIMIT = Infinity;
 const PLAYER_LIMIT = Infinity;
 
-export const parseMatch = async ($: CheerioAPI, matchId: number) => {
+export const parseMatch = async (
+  $: CheerioAPI,
+  matchId: number,
+  matchUrl: string
+) => {
   const componentPromises: Promise<boolean>[] = [];
   // const startTime = Date.now();
   const hltvId = matchId;
@@ -52,7 +59,7 @@ export const parseMatch = async ($: CheerioAPI, matchId: number) => {
   if (!event) {
     const eventPromise = new Promise<boolean>(async (resolve, reject) => {
       const eventPage = !CACHED
-        ? await puppeteerGet(eventUrl)
+        ? await puppeteerGet(eventUrl, matchUrl)
         : fs.readFileSync("cached/event-page.html");
       if (!fs.existsSync("cached/event-page.html")) {
         fs.writeFile("cached/event-page.html", eventPage, (err) => {
@@ -83,7 +90,7 @@ export const parseMatch = async ($: CheerioAPI, matchId: number) => {
         return true;
       }
       const playerPage = !CACHED
-        ? await puppeteerGet(playerUrl)
+        ? await puppeteerGet(playerUrl, matchUrl)
         : fs.readFileSync("cached/player-page.html");
       if (!fs.existsSync("cached/player-page.html")) {
         fs.writeFile("cached/player-page.html", playerPage, (err) => {
@@ -112,8 +119,7 @@ export const parseMatch = async ($: CheerioAPI, matchId: number) => {
   let mapLinks = $(
     "div.mapholder > div > div.results-center > div.results-center-stats > a"
   ).toArray();
-  const handleMaps = async (links): Promise<boolean> => {
-    links;
+  const handleMaps = async (links, referUrl: string): Promise<boolean> => {
     const mapPromises: Promise<boolean>[] = [];
     for (const mapLink of links) {
       mapPromises.push(
@@ -127,14 +133,15 @@ export const parseMatch = async ($: CheerioAPI, matchId: number) => {
             return true;
           }
           const mapPage = !CACHED
-            ? await puppeteerGet(mapUrl)
+            ? await puppeteerGet(mapUrl, referUrl)
             : fs.readFileSync("cached/map-page.html");
           if (!fs.existsSync("cached/map-page.html")) {
             fs.writeFile("cached/map-page.html", mapPage, (err) => {
               if (err) throw err;
             });
           }
-          if (mapPage) await parseMap(load(mapPage), mapId, matchId, rankings);
+          if (mapPage)
+            await parseMap(load(mapPage), mapId, matchId, rankings, mapUrl);
           resolve(true);
         })
       );
@@ -157,7 +164,7 @@ export const parseMatch = async ($: CheerioAPI, matchId: number) => {
       } else {
         const statsPromise = new Promise<boolean>(async (resolve, reject) => {
           const statsPage = !CACHED
-            ? await puppeteerGet(statsUrl)
+            ? await puppeteerGet(statsUrl, matchUrl)
             : fs.readFileSync("cached/stats-page.html");
           if (!fs.existsSync("cached/stats-page.html")) {
             fs.writeFile("cached/stats-page.html", statsPage, (err) => {
@@ -166,7 +173,7 @@ export const parseMatch = async ($: CheerioAPI, matchId: number) => {
           }
           if (statsPage) {
             const links = await parseMatchStats(load(statsPage));
-            await handleMaps(links);
+            await handleMaps(links, statsUrl);
           }
           resolve(true);
         });
@@ -176,7 +183,7 @@ export const parseMatch = async ($: CheerioAPI, matchId: number) => {
       throw new Error(`No maps available`);
     }
   } else {
-    componentPromises.push(handleMaps(mapLinks));
+    componentPromises.push(handleMaps(mapLinks, matchUrl));
   }
   await Promise.all(componentPromises);
   if (CACHED) {
@@ -211,7 +218,8 @@ const parseMap = async (
   $: CheerioAPI,
   mapId: number,
   matchId: number,
-  rankings: { firstTeam: number | null; secondTeam: number | null }
+  rankings: { firstTeam: number | null; secondTeam: number | null },
+  mapUrl: string
 ) => {
   const hltvId = mapId;
   let mapType = null;
@@ -267,7 +275,7 @@ const parseMap = async (
   let secondTeamStats = null;
   const mapPerformanceUrl = mapPerformanceLink.attribs["href"];
   const mapPerformancePage = !CACHED
-    ? await puppeteerGet(mapPerformanceUrl, true)
+    ? await puppeteerGet(mapPerformanceUrl, mapUrl, true)
     : fs.readFileSync("cached/map-performance-page.html");
   if (!fs.existsSync("cached/map-performance-page.html")) {
     fs.writeFile(
@@ -573,25 +581,29 @@ export const parseResults = async ($: CheerioAPI, resultsUrl: string) => {
       continue;
     }
     const resultPromise = new Promise<boolean>(async (resolve, reject) => {
-      const resultPage = !CACHED
-        ? await puppeteerGet(resultUrl)
-        : fs.readFileSync("cached/result-page.html");
-      if (!fs.existsSync("cached/result-page.html")) {
-        fs.writeFile("cached/result-page.html", resultPage, (err) => {
-          if (err) throw err;
-        });
-      }
-      if (resultPage)
-        await parseMatch(load(resultPage), matchId).catch((err) => {
-          console.log(
-            "Unable to parse match ID " +
-              matchId +
-              ", reason: '" +
-              err +
-              "', skipping it."
+      setTimeout(async () => {
+        const resultPage = !CACHED
+          ? await puppeteerGet(resultUrl, resultsUrl)
+          : fs.readFileSync("cached/result-page.html");
+        if (!fs.existsSync("cached/result-page.html")) {
+          fs.writeFile("cached/result-page.html", resultPage, (err) => {
+            if (err) throw err;
+          });
+        }
+        if (resultPage)
+          await parseMatch(load(resultPage), matchId, resultUrl).catch(
+            (err) => {
+              console.log(
+                "Unable to parse match ID " +
+                  matchId +
+                  ", reason: '" +
+                  err +
+                  "', skipping it."
+              );
+            }
           );
-        });
-      resolve(true);
+        resolve(true);
+      }, Math.random() * 5000 + SCRAPE_DELAY);
     });
     resultPromises.push(resultPromise);
   }
@@ -608,7 +620,7 @@ export const parseResults = async ($: CheerioAPI, resultsUrl: string) => {
       console.log("You reached the end!");
       return;
     }
-    const nextResultsPage = await puppeteerGet(nextUrl, true);
+    const nextResultsPage = await puppeteerGet(nextUrl, resultsUrl, true);
     if (!nextResultsPage) throw new Error("Unable to find next results page.");
     await parseResults(load(nextResultsPage), nextUrl);
   }

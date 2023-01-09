@@ -12,7 +12,7 @@ const NUM_HEADFUL = Number(process.env.NUM_HEADFUL);
 const MAX_CHALLENGE_TRIES = Number(process.env.MAX_CHALLENGE_TRIES);
 const BROWSER_LIMIT = Number(process.env.BROWSER_LIMIT) || 1;
 const FORCE_HEADFUL = process.env.FORCE_HEADFUL;
-const FORCE_HEADLESS = process.env.FORCE_HEADFUL;
+const FORCE_HEADLESS = process.env.FORCE_HEADLESS;
 const SCRAPE_DELAY = Number(process.env.SCRAPE_DELAY) || 0;
 
 events.EventEmitter.defaultMaxListeners = BROWSER_LIMIT + 5;
@@ -67,11 +67,15 @@ let allBrowsersCreated = false;
 })();
 
 // much of this function comes from the npm package "pupflare"
-const puppeteerGet = async (url: string, headful: boolean = false) => {
+const puppeteerGet = async (
+  url: string,
+  refererUrl?: string,
+  headful: boolean = false
+) => {
   await new Promise((resolve, reject) =>
     setTimeout(() => {
       resolve(true);
-    }, Math.random() * 1000 + SCRAPE_DELAY)
+    }, Math.random() * 5000 + SCRAPE_DELAY)
   );
   if (inProgressUrls.has(url)) return;
   if (FORCE_HEADFUL) headful = true;
@@ -113,6 +117,7 @@ const puppeteerGet = async (url: string, headful: boolean = false) => {
   //     interceptedRequest.continue(data);
   //   });
   // }
+  if (refererUrl) page.setExtraHTTPHeaders({ Referer: BASE_URL + refererUrl });
   const client = await page.target().createCDPSession();
   await client.send("Network.setRequestInterception", {
     patterns: [
@@ -152,16 +157,20 @@ const puppeteerGet = async (url: string, headful: boolean = false) => {
       });
     } catch (err) {
       console.error(`Unable to open page ${url}`, err);
-      puppeteerGet(url, headful);
+      puppeteerGet(url, refererUrl, headful);
       throw err;
     }
     responseBody = await response.text();
     responseData = await response.buffer();
-    if (responseBody.includes("Access Denied")) {
+    if (
+      responseBody.includes("Access Denied") ||
+      responseBody.includes("Error 1012") ||
+      responseBody.includes("Denied Access")
+    ) {
       console.error(
         `Browser fetching url ${url} was blocked, removing it from the pool now.`
       );
-      return await puppeteerGet(url, headful);
+      return await puppeteerGet(url, refererUrl, headful);
     }
     while (
       responseBody.includes("challenge-running") &&
@@ -185,7 +194,7 @@ const puppeteerGet = async (url: string, headful: boolean = false) => {
           `Headless scraping failed for URL ${url}, trying headful scraping.`
         );
         inProgressUrls.delete(url);
-        return await puppeteerGet(url, true);
+        return await puppeteerGet(url, refererUrl, true);
       } else {
         throw new Error(`Unable to beat challenge for url ${url}.`);
       }
@@ -193,13 +202,13 @@ const puppeteerGet = async (url: string, headful: boolean = false) => {
     // if (tryCount > 0) console.log(`Beat challenge after ${tryCount} tries`);
     responseHeaders = await response.headers();
     responseHeadersToRemove.forEach((header) => delete responseHeaders[header]);
+    // await page.close();
   } catch (error) {
     console.error(`Error while fetching url ${url}`, error);
     if (!error.toString().includes("ERR_BLOCKED_BY_CLIENT")) {
       console.error("Error sending request: ", error);
     }
   }
-  await page.close();
   (headful ? availableHeadfulBrowsers : availableHeadlessBrowsers).push(
     currBrowser
   );

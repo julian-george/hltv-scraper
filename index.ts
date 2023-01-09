@@ -25,7 +25,7 @@ const CACHED = !!process.env.SCRAPE_CACHED;
     ? `/results?offset=${RESULT_OFFSET}`
     : "cached/results-browser.html";
   const resultsPage = !CACHED
-    ? await puppeteerGet(initialResultUrl, true)
+    ? await puppeteerGet(initialResultUrl, "https://hltv.org", true)
     : fs.readFileSync("cached/results-browser.html");
   if (!fs.existsSync("cached/results-browser.html")) {
     fs.writeFile("cached/results-browser.html", resultsPage, (err) => {
