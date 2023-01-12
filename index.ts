@@ -24,13 +24,17 @@ const CACHED = !!process.env.SCRAPE_CACHED;
   const initialResultUrl = !CACHED
     ? `/results?offset=${RESULT_OFFSET}`
     : "cached/results-browser.html";
-  const resultsPage = !CACHED
-    ? await puppeteerGet(initialResultUrl, "https://hltv.org", true)
-    : fs.readFileSync("cached/results-browser.html");
-  if (!fs.existsSync("cached/results-browser.html")) {
-    fs.writeFile("cached/results-browser.html", resultsPage, (err) => {
-      if (err) throw err;
-    });
+  try {
+    const resultsPage = !CACHED
+      ? await puppeteerGet(initialResultUrl, "https://hltv.org", true)
+      : fs.readFileSync("cached/results-browser.html");
+    if (!fs.existsSync("cached/results-browser.html")) {
+      fs.writeFile("cached/results-browser.html", resultsPage, (err) => {
+        if (err) throw err;
+      });
+    }
+    await parseResults(load(resultsPage), initialResultUrl);
+  } catch (err) {
+    console.log("Unable to scrape results browser: ", err);
   }
-  await parseResults(load(resultsPage), initialResultUrl);
 })();

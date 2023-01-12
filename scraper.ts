@@ -6,6 +6,7 @@ import { createPlayer, getPlayerByHltvId } from "./services/player-service";
 import { createMap, getMapByHltvId } from "./services/map-service";
 import { createMatch, getMatchByHltvId } from "./services/match-service";
 import puppeteerGet from "./scrape-client";
+import { delay } from "./scrape-util";
 
 dotenv.config();
 
@@ -55,6 +56,15 @@ export const parseMatch = async (
   }
   const eventUrl = eventLink.attribs["href"];
   const eventId = Number(eventUrl.split("/")[2]);
+  const match = await createMatch({
+    hltvId,
+    title,
+    eventId,
+    date,
+    format,
+    online,
+    matchType,
+  });
   const event = await getEventByHltvId(eventId);
   if (!event) {
     const eventPromise = new Promise<boolean>(async (resolve, reject) => {
@@ -198,16 +208,7 @@ export const parseMatch = async (
     });
     return;
   }
-
-  return await createMatch({
-    hltvId,
-    title,
-    eventId,
-    date,
-    format,
-    online,
-    matchType,
-  });
+  return match;
 };
 
 const parseMatchStats = async ($: CheerioAPI) => {
@@ -581,29 +582,26 @@ export const parseResults = async ($: CheerioAPI, resultsUrl: string) => {
       continue;
     }
     const resultPromise = new Promise<boolean>(async (resolve, reject) => {
-      setTimeout(async () => {
-        const resultPage = !CACHED
-          ? await puppeteerGet(resultUrl, resultsUrl)
-          : fs.readFileSync("cached/result-page.html");
-        if (!fs.existsSync("cached/result-page.html")) {
-          fs.writeFile("cached/result-page.html", resultPage, (err) => {
-            if (err) throw err;
-          });
-        }
-        if (resultPage)
-          await parseMatch(load(resultPage), matchId, resultUrl).catch(
-            (err) => {
-              console.log(
-                "Unable to parse match ID " +
-                  matchId +
-                  ", reason: '" +
-                  err +
-                  "', skipping it."
-              );
-            }
+      await delay(Math.random() * 5000 + SCRAPE_DELAY);
+      const resultPage = !CACHED
+        ? await puppeteerGet(resultUrl, resultsUrl)
+        : fs.readFileSync("cached/result-page.html");
+      if (!fs.existsSync("cached/result-page.html")) {
+        fs.writeFile("cached/result-page.html", resultPage, (err) => {
+          if (err) throw err;
+        });
+      }
+      if (resultPage)
+        await parseMatch(load(resultPage), matchId, resultUrl).catch((err) => {
+          console.log(
+            "Error while parsing match ID " +
+              matchId +
+              ", reason: '" +
+              err +
+              "'."
           );
-        resolve(true);
-      }, Math.random() * 5000 + SCRAPE_DELAY);
+        });
+      resolve(true);
     });
     resultPromises.push(resultPromise);
   }
