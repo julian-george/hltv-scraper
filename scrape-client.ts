@@ -106,7 +106,11 @@ const puppeteerGet = async (
   ).shift();
 
   if (!currBrowser) {
-    console.log("no browser for url", url);
+    console.error("No browser for url ", url);
+    return;
+  }
+  if (!currBrowser?.process() || !currBrowser?.process()?.pid) {
+    console.error("No PID for browser scraping url ", url);
     return;
   }
   await delay(Math.random() * 5000 + SCRAPE_DELAY);

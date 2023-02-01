@@ -12,6 +12,7 @@ const RESULT_OFFSET = process.env.RESULT_OFFSET || 0;
 const CACHED = !!process.env.SCRAPE_CACHED;
 
 (async () => {
+  if (!MONGODB_URI) throw new Error("No MongoDB URI given.");
   await mongoose
     .connect(MONGODB_URI)
     .then(() => {
