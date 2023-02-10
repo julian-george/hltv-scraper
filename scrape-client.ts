@@ -82,6 +82,17 @@ const addNewBrowser = async (headful: boolean) => {
   allBrowsersCreated = true;
 })();
 
+const removeBrowser = async (currBrowser, headful, url) => {
+  console.error(
+    "Removed browser info:",
+    browserDict[currBrowser.process().pid]
+  );
+  await currBrowser.close();
+  await addNewBrowser(headful);
+  inProgressUrls.delete(url);
+  delete browserDict[currBrowser.process().pid];
+};
+
 // much of this function comes from the npm package "pupflare"
 const puppeteerGet = async (
   url: string,
@@ -191,14 +202,7 @@ const puppeteerGet = async (
       console.error(
         `Browser fetching url ${url} was blocked, removing it from the pool now.`
       );
-      console.error(
-        "Removed browser info:",
-        browserDict[currBrowser.process().pid]
-      );
-      await currBrowser.close();
-      await addNewBrowser(headful);
-      inProgressUrls.delete(url);
-      delete browserDict[currBrowser.process().pid];
+      await removeBrowser(currBrowser, headful, url);
       return await puppeteerGet(url, refererUrl, headful);
     }
     while (
@@ -235,10 +239,12 @@ const puppeteerGet = async (
     responseHeadersToRemove.forEach((header) => delete responseHeaders[header]);
     await page.close();
   } catch (error) {
-    if (!error.toString().includes("ERR_BLOCKED_BY_CLIENT")) {
-      console.error("Error sending request: ", error);
-    } else {
-      console.error(`Error while fetching url ${url}:`, error);
+    if (error.toString().contains("ERR_TIMED_OUT")) {
+      console.error(
+        `Browser fetching url ${url} timed out, removing it from the pool now.`
+      );
+      await removeBrowser(currBrowser, headful, url);
+      return await puppeteerGet(url, refererUrl, headful);
     }
     console.error(
       "Failed browser info:",
