@@ -56,15 +56,6 @@ export const parseMatch = async (
   }
   const eventUrl = eventLink.attribs["href"];
   const eventId = Number(eventUrl.split("/")[2]);
-  const match = createMatch({
-    hltvId,
-    title,
-    eventId,
-    date,
-    format,
-    online,
-    matchType,
-  });
   const event = await getEventByHltvId(eventId);
   if (!event) {
     const eventPromise = new Promise<boolean>(async (resolve, reject) => {
@@ -222,6 +213,15 @@ export const parseMatch = async (
     });
     return;
   }
+  const match = createMatch({
+    hltvId,
+    title,
+    eventId,
+    date,
+    format,
+    online,
+    matchType,
+  });
   return match;
 };
 
