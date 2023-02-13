@@ -7,6 +7,7 @@ import { anonymizeProxy } from "proxy-chain";
 import { shuffle } from "lodash";
 import events from "events";
 import { delay } from "./scrape-util";
+import "log-timestamp";
 
 dotenv.config();
 const NUM_HEADFUL = Number(process.env.NUM_HEADFUL);
@@ -85,10 +86,18 @@ const addNewBrowser = async (headful: boolean) => {
 const removeBrowser = async (currBrowser, headful, url) => {
   console.error(
     "Removed browser info:",
+    currBrowser.process().pid,
     browserDict[currBrowser.process().pid]
   );
   try {
-    await currBrowser.close();
+    currBrowser
+      .close()
+      .then(() => {
+        console.log("Done closing browser.");
+      })
+      .catch((err) => {
+        console.error("Error while closing browser", err);
+      });
   } catch (e) {
     console.error("Error while closing browser", e);
   }
@@ -171,7 +180,11 @@ const puppeteerGet = async (
       try {
         await client.send("Network.continueInterceptedRequest", obj);
       } catch (err) {
-        console.error("Unable to continue intercepted request ", e, err);
+        console.error(
+          "Unable to continue intercepted request ",
+          obj,
+          err.message
+        );
       }
       if (e.isDownload) await page.close();
     });
@@ -214,7 +227,12 @@ const puppeteerGet = async (
       console.error(
         `Browser fetching url ${url} was blocked, removing it from the pool now.`
       );
-      await removeBrowser(currBrowser, headful, url);
+      try {
+        await removeBrowser(currBrowser, headful, url);
+      } catch (err) {
+        console.error("Error while removing browser", err);
+      }
+
       return await puppeteerGet(url, refererUrl, headful);
     }
     while (
@@ -250,11 +268,16 @@ const puppeteerGet = async (
     // responseHeaders = await response.headers();
     // responseHeadersToRemove.forEach((header) => delete responseHeaders[header]);
     // console.log("about to close");
-    page.close();
+    page.close().catch((err) => {
+      console.error(`Error while closing page for URL ${url}`, err);
+    });
   } catch (error) {
-    if (error.toString().includes("ERR_TIMED_OUT")) {
+    if (
+      error.toString().includes("ERR_TIMED_OUT") ||
+      error.toString().includes("ERR_EMPTY_RESPONSE")
+    ) {
       console.error(
-        `Browser fetching url ${url} timed out, removing it from the pool now.`
+        `Browser fetching url ${url} timed out (${error.toString()}), removing it from the pool now.`
       );
       await removeBrowser(currBrowser, headful, url);
       return await puppeteerGet(url, refererUrl, headful);
