@@ -87,7 +87,11 @@ const removeBrowser = async (currBrowser, headful, url) => {
     "Removed browser info:",
     browserDict[currBrowser.process().pid]
   );
-  await currBrowser.close();
+  try {
+    await currBrowser.close();
+  } catch (e) {
+    console.error("Error while closing browser", e);
+  }
   await addNewBrowser(headful);
   inProgressUrls.delete(url);
   delete browserDict[currBrowser.process().pid];
@@ -151,9 +155,6 @@ const puppeteerGet = async (
 
     client.on("Network.requestIntercepted", async (e) => {
       let obj = { interceptionId: e.interceptionId };
-      if (!e?.interceptionId) {
-        console.log(e);
-      }
       if (e.isDownload) {
         await client
           .send("Network.getResponseBodyForInterception", {
@@ -169,8 +170,8 @@ const puppeteerGet = async (
       }
       try {
         await client.send("Network.continueInterceptedRequest", obj);
-      } catch (e) {
-        console.error("Unable to continue intercepted request ", e);
+      } catch (err) {
+        console.error("Unable to continue intercepted request ", e, err);
       }
       if (e.isDownload) await page.close();
     });
@@ -236,7 +237,7 @@ const puppeteerGet = async (
       // await page.screenshot({ path: "cf.png", fullPage: true });
     }
     if (responseBody.includes("challenge-running")) {
-      console.log(
+      console.error(
         `Unable to beat challenge for url ${url}, retrying with new browser`
       );
       (headful ? availableHeadfulBrowsers : availableHeadlessBrowsers).push(
