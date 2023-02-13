@@ -151,43 +151,6 @@ const puppeteerGet = async (
     const page = await currBrowser.newPage();
     if (refererUrl)
       page.setExtraHTTPHeaders({ Referer: BASE_URL + refererUrl });
-    const client = await page.target().createCDPSession();
-    await client.send("Network.setRequestInterception", {
-      patterns: [
-        {
-          urlPattern: "*",
-          resourceType: "Document",
-          interceptionStage: "HeadersReceived",
-        },
-      ],
-    });
-
-    client.on("Network.requestIntercepted", async (e) => {
-      let obj = { interceptionId: e.interceptionId };
-      if (e.isDownload) {
-        await client
-          .send("Network.getResponseBodyForInterception", {
-            interceptionId: e.interceptionId,
-          })
-          .then((result) => {
-            if (result.base64Encoded) {
-              responseData = Buffer.from(result.body, "base64");
-            }
-          });
-        obj["errorReason"] = "BlockedByClient";
-        responseHeaders = e.responseHeaders;
-      }
-      try {
-        await client.send("Network.continueInterceptedRequest", obj);
-      } catch (err) {
-        console.error(
-          "Unable to continue intercepted request ",
-          obj,
-          err.message
-        );
-      }
-      if (e.isDownload) await page.close();
-    });
     await page.setRequestInterception(true);
     page.on("request", (request) => {
       if (!request.url().includes("hltv") || request.url().includes("cdn-cgi"))
