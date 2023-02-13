@@ -7,6 +7,7 @@
     "dev": "npx ts-node index.ts",
     "build": "npx tsc",
     "start": "node dist/index.js",
+    "log": "yarn start > log.txt 2> error-log.txt",
     "clean": "rm -rf dist/**"
   },
   "author": "",
@@ -22,7 +23,8 @@
     "puppeteer": "18.1.0",
     "puppeteer-extra": "^3.3.4",
     "puppeteer-extra-plugin-stealth": "^2.11.1",
-    "request": "^2.88.2"
+    "request": "^2.88.2",
+    "rimraf": "^4.1.2"
   },
   "devDependencies": {
     "@types/axios": "^0.14.0",

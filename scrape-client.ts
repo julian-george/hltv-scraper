@@ -51,7 +51,7 @@ let allBrowsersCreated = false;
 
 const addNewBrowser = async (headful: boolean) => {
   if (ips.length == 0) {
-    console.log("No more IPs available");
+    console.error("No more IPs available");
     return;
   }
   const ip = ips.pop();
@@ -102,12 +102,13 @@ const puppeteerGet = async (
   if (inProgressUrls.has(url)) return;
   if (FORCE_HEADFUL) headful = true;
   if (FORCE_HEADLESS) headful = false;
+
   while (
     !allBrowsersCreated ||
     (headful ? availableHeadfulBrowsers : availableHeadlessBrowsers).length == 0
   ) {
     // console.log("no browsers available for url", url, "waiting");
-    await delay(Math.random() * 5000);
+    await delay(Math.random() * 2500);
   }
 
   const currBrowser = (
@@ -124,7 +125,7 @@ const puppeteerGet = async (
     console.error("No PID for browser scraping url ", url);
     return;
   }
-  await delay(Math.random() * 5000 + SCRAPE_DELAY);
+  await delay(Math.random() * 1000 + SCRAPE_DELAY);
   inProgressUrls.add(url);
   const fullUrl = BASE_URL + url;
   console.log("Scraping", fullUrl);
@@ -135,17 +136,6 @@ const puppeteerGet = async (
 
   try {
     const page = await currBrowser.newPage();
-    // if (request.method == "POST") {
-    //   await page.removeAllListeners("request");
-    //   await page.setRequestInterception(true);
-    //   page.on("request", (interceptedRequest) => {
-    //     var data = {
-    //       method: "POST",
-    //       postData: request.rawBody,
-    //     };
-    //     interceptedRequest.continue(data);
-    //   });
-    // }
     if (refererUrl)
       page.setExtraHTTPHeaders({ Referer: BASE_URL + refererUrl });
     const client = await page.target().createCDPSession();
@@ -161,6 +151,9 @@ const puppeteerGet = async (
 
     client.on("Network.requestIntercepted", async (e) => {
       let obj = { interceptionId: e.interceptionId };
+      if (!e?.interceptionId) {
+        console.log(e);
+      }
       if (e.isDownload) {
         await client
           .send("Network.getResponseBodyForInterception", {
@@ -177,9 +170,25 @@ const puppeteerGet = async (
       try {
         await client.send("Network.continueInterceptedRequest", obj);
       } catch (e) {
-        console.log("Unable to continue intercepted request ", e);
+        console.error("Unable to continue intercepted request ", e);
       }
       if (e.isDownload) await page.close();
+    });
+    await page.setRequestInterception(true);
+    page.on("request", (request) => {
+      if (!request.url().includes("hltv") || request.url().includes("cdn-cgi"))
+        request.continue();
+      else {
+        if (
+          ["image", "stylesheet", "script"].includes(request.resourceType())
+        ) {
+          // if (!request.url().includes("img-cdn.hltv.org"))
+          //   console.log(request.url(), request.headers());
+          request.abort();
+        } else {
+          request.continue();
+        }
+      }
     });
     let response;
     let tryCount = 0;
@@ -194,7 +203,9 @@ const puppeteerGet = async (
       throw err;
     }
     responseBody = await response.text();
+    // console.log("response data received");
     responseData = await response.buffer();
+    // console.log("response buffer received");
     if (
       !responseBody.includes("challenge-running") &&
       !responseBody.includes("© HLTV.org")
@@ -235,11 +246,12 @@ const puppeteerGet = async (
       return await puppeteerGet(url, refererUrl, true);
     }
     // if (tryCount > 0) console.log(`Beat challenge after ${tryCount} tries`);
-    responseHeaders = await response.headers();
-    responseHeadersToRemove.forEach((header) => delete responseHeaders[header]);
-    await page.close();
+    // responseHeaders = await response.headers();
+    // responseHeadersToRemove.forEach((header) => delete responseHeaders[header]);
+    // console.log("about to close");
+    page.close();
   } catch (error) {
-    if (error.toString().contains("ERR_TIMED_OUT")) {
+    if (error.toString().includes("ERR_TIMED_OUT")) {
       console.error(
         `Browser fetching url ${url} timed out, removing it from the pool now.`
       );

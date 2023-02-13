@@ -56,7 +56,7 @@ export const parseMatch = async (
   }
   const eventUrl = eventLink.attribs["href"];
   const eventId = Number(eventUrl.split("/")[2]);
-  const match = await createMatch({
+  const match = createMatch({
     hltvId,
     title,
     eventId,
@@ -151,7 +151,19 @@ export const parseMatch = async (
             });
           }
           if (mapPage)
-            await parseMap(load(mapPage), mapId, matchId, rankings, mapUrl);
+            parseMap(load(mapPage), mapId, matchId, rankings, mapUrl)
+              .then(() => {
+                resolve(true);
+              })
+              .catch((err) => {
+                console.error(
+                  "Error while parsing map ID " +
+                    mapId +
+                    ", reason: '" +
+                    err +
+                    "'."
+                );
+              });
           resolve(true);
         })
       );
@@ -182,8 +194,10 @@ export const parseMatch = async (
             });
           }
           if (statsPage) {
-            const links = await parseMatchStats(load(statsPage));
-            await handleMaps(links, statsUrl);
+            try {
+              const links = await parseMatchStats(load(statsPage));
+              await handleMaps(links, statsUrl);
+            } catch (e) {}
           }
           resolve(true);
         });
@@ -498,7 +512,7 @@ const parseEvent = async ($: CheerioAPI, eventId: number) => {
     }
   } catch {}
   if (!CACHED)
-    await createEvent({
+    createEvent({
       hltvId,
       title,
       startDate,
@@ -552,7 +566,7 @@ const parsePlayer = async ($: CheerioAPI, playerId: number) => {
       nationality = $($(".player-realname > .flag")[0]).attr("title");
   } catch {}
   if (!CACHED)
-    await createPlayer({ hltvId, name, birthYear, nationality })
+    createPlayer({ hltvId, name, birthYear, nationality })
       .then((player) => {
         return player;
       })
@@ -565,7 +579,8 @@ const parsePlayer = async ($: CheerioAPI, playerId: number) => {
 };
 
 export const parseResults = async ($: CheerioAPI, resultsUrl: string) => {
-  const resultLinks = $("div.result-con > a")
+  const resultLinks = $("div.allres")
+    .find("div.result-con > a")
     .toArray()
     .slice(0, CACHED ? 1 : RESULT_LIMIT);
   const resultPromises: Promise<boolean>[] = [];
@@ -593,7 +608,7 @@ export const parseResults = async ($: CheerioAPI, resultsUrl: string) => {
       }
       if (resultPage)
         await parseMatch(load(resultPage), matchId, resultUrl).catch((err) => {
-          console.log(
+          console.error(
             "Error while parsing match ID " +
               matchId +
               ", reason: '" +
@@ -605,6 +620,19 @@ export const parseResults = async ($: CheerioAPI, resultsUrl: string) => {
     });
     resultPromises.push(resultPromise);
   }
+  if (!CACHED) {
+    const nextUrl = $("a.pagination-next").attr("href");
+    if (!nextUrl) {
+      console.log("You reached the end!");
+      return;
+    }
+    puppeteerGet(nextUrl, resultsUrl, true).then((nextResultsPage) => {
+      if (!nextResultsPage) console.error("Unable to find next results page.");
+      else {
+        parseResults(load(nextResultsPage), nextUrl);
+      }
+    });
+  }
   const resultStart = Date.now();
   await Promise.all(resultPromises);
   const resultEnd = Date.now();
@@ -612,14 +640,4 @@ export const parseResults = async ($: CheerioAPI, resultsUrl: string) => {
   console.log(
     `Page of results url ${resultsUrl} took ${resultElapsed} seconds!`
   );
-  if (!CACHED) {
-    const nextUrl = $("a.pagination-next").attr("href");
-    if (!nextUrl) {
-      console.log("You reached the end!");
-      return;
-    }
-    const nextResultsPage = await puppeteerGet(nextUrl, resultsUrl, true);
-    if (!nextResultsPage) throw new Error("Unable to find next results page.");
-    await parseResults(load(nextResultsPage), nextUrl);
-  }
 };
