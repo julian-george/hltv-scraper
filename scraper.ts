@@ -612,7 +612,6 @@ export const parseResults = async ($: CheerioAPI, resultsUrl: string) => {
       continue;
     }
     const resultPromise = new Promise<boolean>(async (resolve, reject) => {
-      await delay(Math.random() * 5000 + SCRAPE_DELAY);
       const resultPage = !CACHED
         ? await puppeteerGet(resultUrl, resultsUrl)
         : fs.readFileSync("cached/result-page.html");

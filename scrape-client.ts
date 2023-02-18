@@ -139,7 +139,7 @@ const puppeteerGet = async (
     console.error("No PID for browser scraping url ", url);
     return;
   }
-  await delay(Math.random() * 1000 + SCRAPE_DELAY);
+  await delay(SCRAPE_DELAY);
   inProgressUrls.add(url);
   const fullUrl = BASE_URL + url;
   console.log("Scraping", fullUrl);
