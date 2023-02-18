@@ -64,6 +64,7 @@ const addNewBrowser = async (headful: boolean) => {
       "--no-sandbox",
       "--disable-setuid-sandbox",
       "--disable-gpu",
+      // "--user-data-dir=/Users/julian/Library/Application Support/Google/Chrome",
       proxyString,
     ],
   });
@@ -93,7 +94,7 @@ const removeBrowser = async (currBrowser, headful, url) => {
     currBrowser
       .close()
       .then(() => {
-        console.log("Done closing browser.");
+        // console.log("Done closing browser.");
       })
       .catch((err) => {
         console.error("Error while closing browser", err);
@@ -146,9 +147,9 @@ const puppeteerGet = async (
   let responseData;
   let responseHeaders;
   let responseUrl;
-
+  let page;
   try {
-    const page = await currBrowser.newPage();
+    page = await currBrowser.newPage();
     if (refererUrl)
       page.setExtraHTTPHeaders({ Referer: BASE_URL + refererUrl });
     await page.setRequestInterception(true);
@@ -244,11 +245,14 @@ const puppeteerGet = async (
       );
       await removeBrowser(currBrowser, headful, url);
       return await puppeteerGet(url, refererUrl, headful);
+    } else if (error.toString().includes("ERR_CONNECTION_CLOSED")) {
+      console.error(`Browser fetching ${url} failed to connect, retrying.`);
+      (headful ? availableHeadfulBrowsers : availableHeadlessBrowsers).push(
+        currBrowser
+      );
+      if (page) page.close();
+      return await puppeteerGet(url, refererUrl, headful);
     }
-    console.error(
-      "Failed browser info:",
-      browserDict[currBrowser.process().pid]
-    );
   }
   (headful ? availableHeadfulBrowsers : availableHeadlessBrowsers).push(
     currBrowser

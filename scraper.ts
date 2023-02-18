@@ -213,7 +213,7 @@ export const parseMatch = async (
     });
     return;
   }
-  const match = createMatch({
+  const match = await createMatch({
     hltvId,
     title,
     eventId,
@@ -378,9 +378,16 @@ const parseMap = async (
       .then((map) => {
         return map;
       })
-      .catch((err) =>
-        console.error("Unable to add map ID " + hltvId + " to database: ", err)
-      );
+      .catch((err) => {
+        if (err.toString().includes("E11000")) {
+          console.error("Duplicate map", hltvId);
+        } else {
+          console.error(
+            "Unable to add map ID " + hltvId + " to database: ",
+            err
+          );
+        }
+      });
 };
 
 const parseMapPerformance = async ($: CheerioAPI) => {
@@ -527,12 +534,16 @@ const parseEvent = async ($: CheerioAPI, eventId: number) => {
       .then((event) => {
         return event;
       })
-      .catch((err) =>
-        console.error(
-          "Unable to add event ID " + hltvId + " to database: ",
-          err
-        )
-      );
+      .catch((err) => {
+        if (err.toString().includes("E11000")) {
+          console.log("Duplicate event ", hltvId);
+        } else {
+          console.error(
+            "Unable to add event ID " + hltvId + " to database: ",
+            err
+          );
+        }
+      });
 };
 
 const parsePlayer = async ($: CheerioAPI, playerId: number) => {
@@ -570,12 +581,16 @@ const parsePlayer = async ($: CheerioAPI, playerId: number) => {
       .then((player) => {
         return player;
       })
-      .catch((err) =>
-        console.error(
-          "Unable to add player ID " + hltvId + " to database: ",
-          err
-        )
-      );
+      .catch((err) => {
+        if (err.toString().includes("E11000")) {
+          console.error("Duplicate player", hltvId);
+        } else {
+          console.error(
+            "Unable to add player ID " + hltvId + " to database: ",
+            err
+          );
+        }
+      });
 };
 
 export const parseResults = async ($: CheerioAPI, resultsUrl: string) => {
