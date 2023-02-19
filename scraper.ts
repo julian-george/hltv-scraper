@@ -84,9 +84,9 @@ export const parseMatch = async (
     const playerPromise = new Promise<boolean>(async (resolve, reject) => {
       const player = await getPlayerByHltvId(playerId);
       if (player) {
-        console.log(
-          "Player ID " + playerId + " already in database, skipping."
-        );
+        // console.log(
+        //   "Player ID " + playerId + " already in database, skipping."
+        // );
         resolve(true);
         return true;
       }
@@ -200,7 +200,7 @@ export const parseMatch = async (
   } else {
     componentPromises.push(handleMaps(mapLinks, matchUrl));
   }
-  await Promise.all(componentPromises);
+  await Promise.any(componentPromises);
   if (CACHED) {
     console.log("New match", {
       hltvId,
