@@ -185,6 +185,13 @@ const puppeteerGet = async (
     responseData = await response.buffer();
     // console.log("response buffer received");
     if (
+      responseBody.includes("/img/static/error.png") &&
+      responseBody.includes("500")
+    ) {
+      console.error(`Server error 500 for url ${url}`);
+      return null;
+    }
+    if (
       !responseBody.includes("challenge-running") &&
       !responseBody.includes("© HLTV.org")
     ) {

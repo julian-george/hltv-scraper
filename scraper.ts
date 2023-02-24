@@ -6,13 +6,15 @@ import { createPlayer, getPlayerByHltvId } from "./services/player-service";
 import { createMap, getMapByHltvId } from "./services/map-service";
 import { createMatch, getMatchByHltvId } from "./services/match-service";
 import puppeteerGet from "./scrape-client";
-import { delay } from "./scrape-util";
 
 dotenv.config();
 
+// If true, scrapes cached pages saved in ../cached
 const CACHED = !!process.env.SCRAPE_CACHED;
+// If true, stops adding new matches to queue once already-traversed one is reached
 const ABORT_UPON_DUPLICATE = process?.env?.ABORT_UPON_DUPLICATE || 0;
-const SCRAPE_DELAY = Number(process.env.SCRAPE_DELAY) || 0;
+// If true, traverses already added matches to get any submodels that could have had errors
+const TRAVERSE_ADDED_MATCHES = process?.env?.TRAVERSE_ADDED_MATCHES || 0;
 
 // Practically deprecated, maybe useful for testing
 const RESULT_LIMIT = Infinity;
@@ -51,33 +53,35 @@ export const parseMatch = async (
   } catch {}
 
   const eventLink = $("div.event > a")[0];
+  let eventId = null;
   if (!eventLink) {
-    throw new Error("No event link");
-  }
-  const eventUrl = eventLink.attribs["href"];
-  const eventId = Number(eventUrl.split("/")[2]);
-  const event = await getEventByHltvId(eventId);
-  if (!event) {
-    const eventPromise = new Promise<boolean>(async (resolve, reject) => {
-      const eventPage = !CACHED
-        ? await puppeteerGet(eventUrl, matchUrl)
-        : fs.readFileSync("cached/event-page.html");
-      if (!fs.existsSync("cached/event-page.html")) {
-        fs.writeFile("cached/event-page.html", eventPage, (err) => {
-          if (err) throw err;
-        });
-      }
-      if (eventPage) await parseEvent(load(eventPage), eventId);
-      resolve(true);
-    });
-    componentPromises.push(eventPromise);
+    console.error("No event link");
+  } else {
+    const eventUrl = eventLink.attribs["href"];
+    eventId = Number(eventUrl.split("/")[2]);
+    const event = await getEventByHltvId(eventId);
+    if (!event) {
+      const eventPromise = new Promise<boolean>(async (resolve, reject) => {
+        const eventPage = !CACHED
+          ? await puppeteerGet(eventUrl, matchUrl)
+          : fs.readFileSync("cached/event-page.html");
+        if (!fs.existsSync("cached/event-page.html")) {
+          fs.writeFile("cached/event-page.html", eventPage, (err) => {
+            if (err) throw err;
+          });
+        }
+        if (eventPage) await parseEvent(load(eventPage), eventId);
+        resolve(true);
+      });
+      componentPromises.push(eventPromise);
+    }
   }
 
   const playerLinks = $("div#all-content > table.totalstats")
     .find("td.players > div.flagAlign > a")
     .toArray()
     .slice(0, CACHED ? 1 : PLAYER_LIMIT);
-  // const playersStartTime = Date.now();
+  // const plfayersStartTime = Date.now();
   for (const playerLink of playerLinks) {
     const playerUrl = playerLink.attribs["href"];
     const playerId = Number(playerUrl.split("/")[2]);
@@ -195,12 +199,12 @@ export const parseMatch = async (
         componentPromises.push(statsPromise);
       }
     } else {
-      throw new Error(`No maps available`);
+      console.error(`No maps available for match`, matchId);
     }
   } else {
     componentPromises.push(handleMaps(mapLinks, matchUrl));
   }
-  await Promise.any(componentPromises);
+  await Promise.all(componentPromises);
   if (CACHED) {
     console.log("New match", {
       hltvId,
@@ -213,7 +217,10 @@ export const parseMatch = async (
     });
     return;
   }
-  const match = await createMatch({
+  if (TRAVERSE_ADDED_MATCHES) {
+    return getMatchByHltvId(hltvId);
+  }
+  const match = createMatch({
     hltvId,
     title,
     eventId,
@@ -222,6 +229,15 @@ export const parseMatch = async (
     online,
     matchType,
   });
+  match
+    .then((newMatch) => {
+      return newMatch;
+    })
+    .catch((err) => {
+      if (err.toString().includes("E11000")) {
+        console.log("Duplicate match", hltvId);
+      }
+    });
   return match;
 };
 
@@ -267,6 +283,8 @@ const parseMap = async (
   score = {};
   let teamOneRanking = null;
   let teamTwoRanking = null;
+  let teamOneStats = null;
+  let teamTwoStats = null;
   const firstWon =
     Number($(scoreContainer.childNodes[0]).text()) >=
     Number($(scoreContainer.childNodes[2]).text());
@@ -284,86 +302,93 @@ const parseMap = async (
   const mapPerformanceLink = $(
     ".stats-top-menu-item-link:contains('Performance')"
   )[0];
-  if (!mapPerformanceLink)
-    throw new Error("No map performance link for map ID " + mapId);
-  let firstTeamStats = null;
-  let secondTeamStats = null;
-  const mapPerformanceUrl = mapPerformanceLink.attribs["href"];
-  const mapPerformancePage = !CACHED
-    ? await puppeteerGet(mapPerformanceUrl, mapUrl, true)
-    : fs.readFileSync("cached/map-performance-page.html");
-  if (!fs.existsSync("cached/map-performance-page.html")) {
-    fs.writeFile(
-      "cached/map-performance-page.html",
-      mapPerformancePage,
-      (err) => {
-        if (err) throw err;
+  if (!mapPerformanceLink) {
+    console.error("No map performance link for map ID " + mapId);
+    return null;
+  } else {
+    let firstTeamStats = null;
+    let secondTeamStats = null;
+    const mapPerformanceUrl = mapPerformanceLink.attribs["href"];
+    const mapPerformancePage = !CACHED
+      ? await puppeteerGet(mapPerformanceUrl, mapUrl, true)
+      : fs.readFileSync("cached/map-performance-page.html");
+    if (!fs.existsSync("cached/map-performance-page.html")) {
+      fs.writeFile(
+        "cached/map-performance-page.html",
+        mapPerformancePage,
+        (err) => {
+          if (err) throw err;
+        }
+      );
+    }
+    if (!mapPerformancePage) {
+      console.error("No map performance page found for map ID: " + mapId);
+    } else {
+      ({ firstTeamStats, secondTeamStats } = await parseMapPerformance(
+        load(mapPerformancePage)
+      ));
+      const tStatRows = $("table.tstats > tbody > tr").toArray();
+      const ctStatRows = $("table.ctstats > tbody > tr").toArray();
+      const allRows = [...tStatRows, ...ctStatRows];
+      for (let i = 0; i < allRows.length; i++) {
+        const statAttr = i < tStatRows.length ? "tStats" : "ctStats";
+        const currRow = $(allRows[i]);
+        const playerId = currRow
+          .find("td > div.flag-align > a")[0]
+          .attribs["href"].split("/")[3]
+          .toString();
+        const statObj = {
+          //@ts-ignore
+          kills: Number(currRow.find(".st-kills")[0].childNodes[0].data),
+          hsKills: Number(
+            currRow
+              .find(".st-kills > span")
+              .text()
+              .replace(/[^0-9\.-]+/g, "")
+          ),
+          // @ts-ignore
+          assists: Number(currRow.find(".st-assists")[0].childNodes[0].data),
+          flashAssists: Number(
+            currRow
+              .find(".st-assists > span")
+              .text()
+              .replace(/[^0-9\.-]+/g, "")
+          ),
+          deaths: Number(currRow.find(".st-deaths").text()),
+          kast:
+            Number(currRow.find(".st-kdratio").text().replace("%", "")) * 0.01,
+          adr: Number(currRow.find(".st-adr").text()),
+          fkDiff: Number(
+            currRow
+              .find(".st-fkdiff")
+              .text()
+              .replace(/[^0-9\.-]+/g, "")
+          ),
+          rating: Number(currRow.find(".st-rating").text()),
+        };
+        if (playerId in firstTeamStats) {
+          firstTeamStats[playerId][statAttr] = statObj;
+        } else if (playerId in secondTeamStats) {
+          secondTeamStats[playerId][statAttr] = statObj;
+        }
       }
-    );
-  }
-  if (!mapPerformancePage)
-    throw new Error("No map performance page found for map ID: " + mapId);
-  ({ firstTeamStats, secondTeamStats } = await parseMapPerformance(
-    load(mapPerformancePage)
-  ));
-  const tStatRows = $("table.tstats > tbody > tr").toArray();
-  const ctStatRows = $("table.ctstats > tbody > tr").toArray();
-  const allRows = [...tStatRows, ...ctStatRows];
-  for (let i = 0; i < allRows.length; i++) {
-    const statAttr = i < tStatRows.length ? "tStats" : "ctStats";
-    const currRow = $(allRows[i]);
-    const playerId = currRow
-      .find("td > div.flag-align > a")[0]
-      .attribs["href"].split("/")[3]
-      .toString();
-    const statObj = {
-      //@ts-ignore
-      kills: Number(currRow.find(".st-kills")[0].childNodes[0].data),
-      hsKills: Number(
-        currRow
-          .find(".st-kills > span")
-          .text()
-          .replace(/[^0-9\.-]+/g, "")
-      ),
-      // @ts-ignore
-      assists: Number(currRow.find(".st-assists")[0].childNodes[0].data),
-      flashAssists: Number(
-        currRow
-          .find(".st-assists > span")
-          .text()
-          .replace(/[^0-9\.-]+/g, "")
-      ),
-      deaths: Number(currRow.find(".st-deaths").text()),
-      kast: Number(currRow.find(".st-kdratio").text().replace("%", "")) * 0.01,
-      adr: Number(currRow.find(".st-adr").text()),
-      fkDiff: Number(
-        currRow
-          .find(".st-fkdiff")
-          .text()
-          .replace(/[^0-9\.-]+/g, "")
-      ),
-      rating: Number(currRow.find(".st-rating").text()),
-    };
-    if (playerId in firstTeamStats) {
-      firstTeamStats[playerId][statAttr] = statObj;
-    } else if (playerId in secondTeamStats) {
-      secondTeamStats[playerId][statAttr] = statObj;
+      teamOneStats = [];
+      teamTwoStats = [];
+      for (const hltvId of Object.keys(firstTeamStats)) {
+        (firstWon ? teamOneStats : teamTwoStats).push({
+          ...firstTeamStats[hltvId],
+          hltvId,
+        });
+      }
+      for (const hltvId of Object.keys(secondTeamStats)) {
+        (firstWon ? teamTwoStats : teamOneStats).push({
+          ...secondTeamStats[hltvId],
+          hltvId,
+        });
+      }
     }
   }
-  const teamOneStats = [];
-  const teamTwoStats = [];
-  for (const hltvId of Object.keys(firstTeamStats)) {
-    (firstWon ? teamOneStats : teamTwoStats).push({
-      ...firstTeamStats[hltvId],
-      hltvId,
-    });
-  }
-  for (const hltvId of Object.keys(secondTeamStats)) {
-    (firstWon ? teamTwoStats : teamOneStats).push({
-      ...secondTeamStats[hltvId],
-      hltvId,
-    });
-  }
+
   if (!CACHED)
     createMap({
       hltvId: Number(hltvId),
@@ -380,9 +405,9 @@ const parseMap = async (
       })
       .catch((err) => {
         if (err.toString().includes("E11000")) {
-          console.error("Duplicate map", hltvId);
+          // console.error("Duplicate map", hltvId);
         } else {
-          console.error(
+          throw new Error(
             "Unable to add map ID " + hltvId + " to database: ",
             err
           );
@@ -471,19 +496,23 @@ const parseEvent = async ($: CheerioAPI, eventId: number) => {
   } catch {}
   let teamNum = null;
   try {
-    teamNum = Number(
-      $(".eventMeta > tbody > tr > th:contains('Teams')")
-        .next("td")[0]
-        .attribs["title"].replace(/[^0-9\.-]+/g, "")
-    );
+    teamNum =
+      Number(
+        $(".eventMeta > tbody > tr > th:contains('Teams')")
+          .next("td")[0]
+          .attribs["title"].replace(/[^0-9\.-]+/g, "")
+      ) || null;
   } catch {}
   let prizePool = null;
   try {
-    prizePool = Number(
-      $(".eventMeta > tbody > tr > th:contains('Prize pool')")
-        .next("td")[0]
-        .attribs["title"].replace(/[^0-9\.-]+/g, "")
-    );
+    let prizePoolString = $(
+      ".eventMeta > tbody > tr > th:contains('Prize pool')"
+    )
+      .next("td")[0]
+      .attribs["title"].toLocaleLowerCase();
+    if (!prizePoolString.includes("spots")) {
+      prizePool = Number(prizePoolString.replace(/[^0-9\.-]+/g, "")) || null;
+    }
   } catch {}
   let location = null;
   let online = null;
@@ -499,6 +528,7 @@ const parseEvent = async ($: CheerioAPI, eventId: number) => {
       .children("tr")
       .toArray()
       .reduce((prevObj, currTr) => {
+        // TODO: what is this???
         return {
           ...prevObj,
           [$($(currTr).children("th")[0]).text()]: $(
@@ -536,9 +566,9 @@ const parseEvent = async ($: CheerioAPI, eventId: number) => {
       })
       .catch((err) => {
         if (err.toString().includes("E11000")) {
-          console.log("Duplicate event ", hltvId);
+          // console.log("Duplicate event ", hltvId);
         } else {
-          console.error(
+          throw new Error(
             "Unable to add event ID " + hltvId + " to database: ",
             err
           );
@@ -585,7 +615,7 @@ const parsePlayer = async ($: CheerioAPI, playerId: number) => {
         if (err.toString().includes("E11000")) {
           console.error("Duplicate player", hltvId);
         } else {
-          console.error(
+          throw new Error(
             "Unable to add player ID " + hltvId + " to database: ",
             err
           );
@@ -603,7 +633,7 @@ export const parseResults = async ($: CheerioAPI, resultsUrl: string) => {
     const resultUrl = resultLink.attribs["href"];
     const matchId = Number(resultUrl.split("/")[2]);
     const match = await getMatchByHltvId(matchId);
-    if (match) {
+    if (match && !TRAVERSE_ADDED_MATCHES) {
       if (ABORT_UPON_DUPLICATE) {
         console.log("Match ID " + matchId + " already in database, aborting.");
         return;
