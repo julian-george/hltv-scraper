@@ -218,7 +218,8 @@ export const parseMatch = async (
     return;
   }
   if (TRAVERSE_ADDED_MATCHES) {
-    return getMatchByHltvId(hltvId);
+    const foundMatch = getMatchByHltvId(hltvId);
+    if (foundMatch) return foundMatch;
   }
   const match = createMatch({
     hltvId,
