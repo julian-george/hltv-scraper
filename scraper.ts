@@ -25,7 +25,7 @@ export const parseMatch = async (
   matchId: number,
   matchUrl: string
 ) => {
-  const componentPromises: Promise<boolean>[] = [];
+  const componentExecutors: (() => Promise<boolean>)[] = [];
   // const startTime = Date.now();
   const hltvId = matchId;
   let title = null;
@@ -61,7 +61,7 @@ export const parseMatch = async (
     eventId = Number(eventUrl.split("/")[2]);
     const event = await getEventByHltvId(eventId);
     if (!event) {
-      const eventPromise = new Promise<boolean>(async (resolve, reject) => {
+      const eventExecutor = async () => {
         const eventPage = !CACHED
           ? await puppeteerGet(eventUrl, matchUrl)
           : fs.readFileSync("cached/event-page.html");
@@ -71,9 +71,9 @@ export const parseMatch = async (
           });
         }
         if (eventPage) await parseEvent(load(eventPage), eventId);
-        resolve(true);
-      });
-      componentPromises.push(eventPromise);
+        return true;
+      };
+      componentExecutors.push(eventExecutor);
     }
   }
 
@@ -85,13 +85,12 @@ export const parseMatch = async (
   for (const playerLink of playerLinks) {
     const playerUrl = playerLink.attribs["href"];
     const playerId = Number(playerUrl.split("/")[2]);
-    const playerPromise = new Promise<boolean>(async (resolve, reject) => {
+    const playerExecutor = async () => {
       const player = await getPlayerByHltvId(playerId);
       if (player) {
         // console.log(
         //   "Player ID " + playerId + " already in database, skipping."
         // );
-        resolve(true);
         return true;
       }
       const playerPage = !CACHED
@@ -103,9 +102,9 @@ export const parseMatch = async (
         });
       }
       if (playerPage) await parsePlayer(load(playerPage), playerId);
-      resolve(true);
-    });
-    componentPromises.push(playerPromise);
+      return true;
+    };
+    componentExecutors.push(playerExecutor);
   }
   const rankings = {
     firstTeam:
@@ -147,9 +146,6 @@ export const parseMatch = async (
           }
           if (mapPage)
             parseMap(load(mapPage), mapId, matchId, rankings, mapUrl)
-              .then(() => {
-                resolve(true);
-              })
               .catch((err) => {
                 console.error(
                   "Error while parsing map ID " +
@@ -158,8 +154,12 @@ export const parseMatch = async (
                     err +
                     "'."
                 );
+              })
+              .finally(() => {
+                console.log("fin");
+                resolve(true);
               });
-          resolve(true);
+          // resolve(true);
         })
       );
     }
@@ -179,7 +179,7 @@ export const parseMatch = async (
       if (statsUrl.includes("mapstatsid")) {
         mapLinks = [statsLink];
       } else {
-        const statsPromise = new Promise<boolean>(async (resolve, reject) => {
+        const statsExecutor = async () => {
           const statsPage = !CACHED
             ? await puppeteerGet(statsUrl, matchUrl)
             : fs.readFileSync("cached/stats-page.html");
@@ -192,18 +192,24 @@ export const parseMatch = async (
             try {
               const links = await parseMatchStats(load(statsPage));
               await handleMaps(links, statsUrl);
-            } catch (e) {}
+            } catch (e) {
+              console.error("Error while parsing stats", e);
+            }
           }
-          resolve(true);
-        });
-        componentPromises.push(statsPromise);
+          return true;
+        };
+        componentExecutors.push(statsExecutor);
       }
     } else {
       console.error(`No maps available for match`, matchId);
     }
   } else {
-    componentPromises.push(handleMaps(mapLinks, matchUrl));
+    const handleMapExecutor = async () => {
+      return await handleMaps(mapLinks, matchUrl);
+    };
+    componentExecutors.push(handleMapExecutor);
   }
+  const componentPromises = componentExecutors.map((executor) => executor());
   await Promise.all(componentPromises);
   if (CACHED) {
     console.log("New match", {
@@ -221,25 +227,23 @@ export const parseMatch = async (
     const foundMatch = getMatchByHltvId(hltvId);
     if (foundMatch) return foundMatch;
   }
-  const match = createMatch({
-    hltvId,
-    title,
-    eventId,
-    date,
-    format,
-    online,
-    matchType,
-  });
-  match
-    .then((newMatch) => {
-      return newMatch;
-    })
-    .catch((err) => {
-      if (err.toString().includes("E11000")) {
-        console.log("Duplicate match", hltvId);
-      }
+  try {
+    return await createMatch({
+      hltvId,
+      title,
+      eventId,
+      date,
+      format,
+      online,
+      matchType,
     });
-  return match;
+  } catch (err) {
+    if (err.toString().includes("E11000")) {
+      console.log("Duplicate match", hltvId);
+    } else {
+      throw new Error(`Unable to add match ID ${hltvId} to the database:`, err);
+    }
+  }
 };
 
 const parseMatchStats = async ($: CheerioAPI) => {
@@ -389,31 +393,28 @@ const parseMap = async (
       }
     }
   }
-
   if (!CACHED)
-    createMap({
-      hltvId: Number(hltvId),
-      matchId,
-      mapType,
-      score,
-      teamOneRanking,
-      teamTwoRanking,
-      teamOneStats,
-      teamTwoStats,
-    })
-      .then((map) => {
-        return map;
-      })
-      .catch((err) => {
-        if (err.toString().includes("E11000")) {
-          // console.error("Duplicate map", hltvId);
-        } else {
-          throw new Error(
-            "Unable to add map ID " + hltvId + " to database: ",
-            err
-          );
-        }
+    try {
+      return await createMap({
+        hltvId: Number(hltvId),
+        matchId,
+        mapType,
+        score,
+        teamOneRanking,
+        teamTwoRanking,
+        teamOneStats,
+        teamTwoStats,
       });
+    } catch (err) {
+      if (err.toString().includes("E11000")) {
+        // console.log("Duplicate event ", hltvId);
+      } else {
+        throw new Error(
+          "Unable to add map ID " + hltvId + " to database: ",
+          err
+        );
+      }
+    }
 };
 
 const parseMapPerformance = async ($: CheerioAPI) => {
@@ -550,31 +551,29 @@ const parseEvent = async ($: CheerioAPI, eventId: number) => {
     }
   } catch {}
   if (!CACHED)
-    createEvent({
-      hltvId,
-      title,
-      startDate,
-      endDate,
-      teamNum,
-      prizePool,
-      location,
-      online,
-      format,
-      teamRankings,
-    })
-      .then((event) => {
-        return event;
-      })
-      .catch((err) => {
-        if (err.toString().includes("E11000")) {
-          // console.log("Duplicate event ", hltvId);
-        } else {
-          throw new Error(
-            "Unable to add event ID " + hltvId + " to database: ",
-            err
-          );
-        }
+    try {
+      return await createEvent({
+        hltvId,
+        title,
+        startDate,
+        endDate,
+        teamNum,
+        prizePool,
+        location,
+        online,
+        format,
+        teamRankings,
       });
+    } catch (err) {
+      if (err.toString().includes("E11000")) {
+        // console.log("Duplicate event ", hltvId);
+      } else {
+        throw new Error(
+          "Unable to add event ID " + hltvId + " to database: ",
+          err
+        );
+      }
+    }
 };
 
 const parsePlayer = async ($: CheerioAPI, playerId: number) => {
@@ -608,20 +607,18 @@ const parsePlayer = async ($: CheerioAPI, playerId: number) => {
       nationality = $($(".player-realname > .flag")[0]).attr("title");
   } catch {}
   if (!CACHED)
-    createPlayer({ hltvId, name, birthYear, nationality })
-      .then((player) => {
-        return player;
-      })
-      .catch((err) => {
-        if (err.toString().includes("E11000")) {
-          console.error("Duplicate player", hltvId);
-        } else {
-          throw new Error(
-            "Unable to add player ID " + hltvId + " to database: ",
-            err
-          );
-        }
-      });
+    try {
+      return await createPlayer({ hltvId, name, birthYear, nationality });
+    } catch (err) {
+      if (err.toString().includes("E11000")) {
+        console.error("Duplicate player", hltvId);
+      } else {
+        throw new Error(
+          "Unable to add player ID " + hltvId + " to database: ",
+          err
+        );
+      }
+    }
 };
 
 export const parseResults = async ($: CheerioAPI, resultsUrl: string) => {
@@ -629,7 +626,7 @@ export const parseResults = async ($: CheerioAPI, resultsUrl: string) => {
     .find("div.result-con > a")
     .toArray()
     .slice(0, CACHED ? 1 : RESULT_LIMIT);
-  const resultPromises: Promise<boolean>[] = [];
+  const resultExecutors: (() => Promise<boolean>)[] = [];
   for (const resultLink of resultLinks) {
     const resultUrl = resultLink.attribs["href"];
     const matchId = Number(resultUrl.split("/")[2]);
@@ -642,7 +639,7 @@ export const parseResults = async ($: CheerioAPI, resultsUrl: string) => {
       console.log("Match ID " + matchId + " already in database, skipping.");
       continue;
     }
-    const resultPromise = new Promise<boolean>(async (resolve, reject) => {
+    const resultExecutor = async () => {
       const resultPage = !CACHED
         ? await puppeteerGet(resultUrl, resultsUrl)
         : fs.readFileSync("cached/result-page.html");
@@ -661,9 +658,9 @@ export const parseResults = async ($: CheerioAPI, resultsUrl: string) => {
               "'."
           );
         });
-      resolve(true);
-    });
-    resultPromises.push(resultPromise);
+      return true;
+    };
+    resultExecutors.push(resultExecutor);
   }
   if (!CACHED) {
     const nextUrl = $("a.pagination-next").attr("href");
@@ -679,6 +676,11 @@ export const parseResults = async ($: CheerioAPI, resultsUrl: string) => {
     });
   }
   const resultStart = Date.now();
+  // // For debug: if you ever want to test matches sequentially
+  // for (const executor of resultExecutors){
+  //   await executor()
+  // }
+  const resultPromises = resultExecutors.map((executor) => executor());
   await Promise.all(resultPromises);
   const resultEnd = Date.now();
   const resultElapsed = Math.round((resultEnd - resultStart) / 10) / 100;
