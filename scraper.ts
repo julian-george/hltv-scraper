@@ -156,7 +156,6 @@ export const parseMatch = async (
                 );
               })
               .finally(() => {
-                console.log("fin");
                 resolve(true);
               });
           // resolve(true);
@@ -224,7 +223,7 @@ export const parseMatch = async (
     return;
   }
   if (TRAVERSE_ADDED_MATCHES) {
-    const foundMatch = getMatchByHltvId(hltvId);
+    const foundMatch = await getMatchByHltvId(hltvId);
     if (foundMatch) return foundMatch;
   }
   try {
@@ -611,7 +610,7 @@ const parsePlayer = async ($: CheerioAPI, playerId: number) => {
       return await createPlayer({ hltvId, name, birthYear, nationality });
     } catch (err) {
       if (err.toString().includes("E11000")) {
-        console.error("Duplicate player", hltvId);
+        // console.error("Duplicate player", hltvId);
       } else {
         throw new Error(
           "Unable to add player ID " + hltvId + " to database: ",
