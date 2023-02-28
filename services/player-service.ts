@@ -1,7 +1,8 @@
 import Player, { playerSchema } from "../models/Player";
+import { queryWrapper } from "../scrape-util";
 
 export const getPlayerByHltvId = async (id: number) => {
-  const player = await Player.findOne({ hltvId: id });
+  const player = await queryWrapper(Player.findOne({ hltvId: id }));
   if (!player) return null;
   else return player;
 };
