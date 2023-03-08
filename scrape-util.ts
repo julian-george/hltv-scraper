@@ -9,10 +9,12 @@ export const delay = (ms: number, maxDelay: number = 1500) =>
     }, Math.random() * maxDelay + ms);
   });
 
+// TODO: is this causing redundant event/player scrapes?
 export const queryWrapper = async (query: Query<any, any, any, any>) => {
   for (let i = 0; i < RETRY_NUM; i++) {
     try {
-      return await query;
+      const queryResult = await query;
+      return queryResult || null;
     } catch (err) {
       if (
         err.toString().includes("MongooseServerSelectionError") &&
@@ -20,9 +22,10 @@ export const queryWrapper = async (query: Query<any, any, any, any>) => {
       ) {
         console.error(`Timeout on try ${i}:`, err);
       } else {
-        return null;
+        console.error(`Query error:`, err);
+        throw err;
       }
-      if (i == RETRY_NUM - 1) return null;
+      if (i == RETRY_NUM - 1) throw err;
     }
   }
 };

@@ -307,7 +307,7 @@ const parseMap = async (
     ".stats-top-menu-item-link:contains('Performance')"
   )[0];
   if (!mapPerformanceLink) {
-    console.error("No map performance link for map ID " + mapId);
+    console.log("No map performance link for map ID " + mapId);
     return null;
   } else {
     let firstTeamStats = null;
@@ -326,7 +326,7 @@ const parseMap = async (
       );
     }
     if (!mapPerformancePage) {
-      console.error("No map performance page found for map ID: " + mapId);
+      console.log("No map performance page found for map ID: " + mapId);
     } else {
       ({ firstTeamStats, secondTeamStats } = await parseMapPerformance(
         load(mapPerformancePage)
