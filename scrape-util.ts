@@ -1,5 +1,8 @@
 import { Query } from "mongoose";
 
+const MAX_QUERY_TIME = 20000;
+const MAX_QUERY_WAIT = 1500;
+const MIN_QUERY_WAIT = 200;
 const RETRY_NUM = 5;
 
 export const delay = (ms: number, maxDelay: number = 1500) =>
@@ -9,18 +12,24 @@ export const delay = (ms: number, maxDelay: number = 1500) =>
     }, Math.random() * maxDelay + ms);
   });
 
-// TODO: is this causing redundant event/player scrapes?
 export const queryWrapper = async (query: Query<any, any, any, any>) => {
   for (let i = 0; i < RETRY_NUM; i++) {
     try {
-      const queryResult = await query;
+      const queryResult = await query.maxTimeMS(MAX_QUERY_TIME);
       return queryResult || null;
     } catch (err) {
+      err = err.toString().toLowerCase();
       if (
-        err.toString().includes("MongooseServerSelectionError") &&
-        err.toString().toLowerCase().includes("timed out")
+        // If the query timed out on the server side
+        (err.includes("mongooseserverselectionerror") &&
+          err.includes("timed out")) ||
+        // or if it went over the maxTimeMS set above
+        err.includes("mongoservererror: operation exceeded time limit")
       ) {
         console.error(`Timeout on try ${i}:`, err);
+        query = query.clone();
+        // Short variable delay to prevent clumping of queries at static intervals
+        await delay(MIN_QUERY_WAIT, MAX_QUERY_WAIT - MIN_QUERY_WAIT);
       } else {
         console.error(`Query error:`, err);
         throw err;

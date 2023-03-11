@@ -44,7 +44,10 @@ if (WEBSHARE)
 
 let availableHeadlessBrowsers: Browser[] = [];
 let availableHeadfulBrowsers: Browser[] = [];
-const browserDict: Record<string, { ip: string; anonymizedIp: string }> = {};
+const browserDict: Record<
+  string,
+  { ip: string; anonymizedIp: string; numTimeouts: number }
+> = {};
 
 let inProgressUrls: Set<string> = new Set();
 
@@ -68,7 +71,7 @@ const addNewBrowser = async (headful: boolean) => {
       proxyString,
     ],
   });
-  browserDict[newBrowser.process().pid] = { ip, anonymizedIp };
+  browserDict[newBrowser.process().pid] = { ip, anonymizedIp, numTimeouts: 0 };
   (!headful ? availableHeadlessBrowsers : availableHeadfulBrowsers).push(
     newBrowser
   );
@@ -247,10 +250,14 @@ const puppeteerGet = async (
       error.toString().includes("ERR_TIMED_OUT") ||
       error.toString().includes("ERR_EMPTY_RESPONSE")
     ) {
-      console.error(
-        `Browser fetching url ${url} timed out (${error.toString()}), removing it from the pool now.`
-      );
-      await removeBrowser(currBrowser, headful, url);
+      if (browserDict[currBrowser.process().pid].numTimeouts < 3) {
+        browserDict[currBrowser.process().pid].numTimeouts++;
+      } else {
+        console.error(
+          `Browser fetching url ${url} timed out for the third time: (${error.toString()}), removing it from the pool now.`
+        );
+        await removeBrowser(currBrowser, headful, url);
+      }
       return await puppeteerGet(url, refererUrl, headful);
     } else if (error.toString().includes("ERR_CONNECTION_CLOSED")) {
       console.error(`Browser fetching ${url} failed to connect, retrying.`);
