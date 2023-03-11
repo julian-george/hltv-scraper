@@ -21,8 +21,7 @@ export const queryWrapper = async (query: Query<any, any, any, any>) => {
       err = err.toString().toLowerCase();
       if (
         // If the query timed out on the server side
-        (err.includes("mongooseserverselectionerror") &&
-          err.includes("timed out")) ||
+        err.includes("timed out") ||
         // or if it went over the maxTimeMS set above
         err.includes("mongoservererror: operation exceeded time limit")
       ) {

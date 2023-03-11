@@ -3,6 +3,7 @@ import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import dotenv from "dotenv";
 import { Browser } from "puppeteer";
+import Bottleneck from "bottleneck";
 import { anonymizeProxy } from "proxy-chain";
 import { shuffle } from "lodash";
 import events from "events";
@@ -67,7 +68,6 @@ const addNewBrowser = async (headful: boolean) => {
       "--no-sandbox",
       "--disable-setuid-sandbox",
       "--disable-gpu",
-      // "--user-data-dir=/Users/julian/Library/Application Support/Google/Chrome",
       proxyString,
     ],
   });
@@ -110,8 +110,23 @@ const removeBrowser = async (currBrowser, headful, url) => {
   delete browserDict[currBrowser.process().pid];
 };
 
-// much of this function comes from the npm package "pupflare"
+const queryQueue = new Bottleneck({
+  maxConcurrent: BROWSER_LIMIT,
+  minTime: SCRAPE_DELAY,
+});
+
 const puppeteerGet = async (
+  url: string,
+  refererUrl?: string,
+  headful: boolean = false
+) => {
+  return await queryQueue.schedule(() =>
+    puppeteerGetInner(url, refererUrl, headful)
+  );
+};
+
+// much of this function comes from the npm package "pupflare"
+const puppeteerGetInner = async (
   url: string,
   refererUrl?: string,
   headful: boolean = false
@@ -124,7 +139,7 @@ const puppeteerGet = async (
     !allBrowsersCreated ||
     (headful ? availableHeadfulBrowsers : availableHeadlessBrowsers).length == 0
   ) {
-    // console.log("no browsers available for url", url, "waiting");
+    console.log("no browsers available for url", url, "waiting");
     await delay(Math.random() * 2500);
   }
 
@@ -142,7 +157,7 @@ const puppeteerGet = async (
     console.error("No PID for browser scraping url ", url);
     return;
   }
-  await delay(SCRAPE_DELAY);
+  // await delay(SCRAPE_DELAY);
   inProgressUrls.add(url);
   const fullUrl = BASE_URL + url;
   console.log("Scraping", fullUrl);
