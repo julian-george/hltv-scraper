@@ -3,7 +3,7 @@ import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import dotenv from "dotenv";
 import { Browser } from "puppeteer";
-import Bottleneck from "bottleneck";
+import PQueue from "p-queue";
 import { anonymizeProxy } from "proxy-chain";
 import { shuffle } from "lodash";
 import events from "events";
@@ -110,20 +110,15 @@ const removeBrowser = async (currBrowser, headful, url) => {
   delete browserDict[currBrowser.process().pid];
 };
 
-const queryQueue = new Bottleneck({
-  maxConcurrent: BROWSER_LIMIT,
-  minTime: SCRAPE_DELAY,
+const getQueue = new PQueue({
+  concurrency: BROWSER_LIMIT * 2,
 });
 
-const puppeteerGet = async (
-  url: string,
-  refererUrl?: string,
-  headful: boolean = false
-) => {
-  return await queryQueue.schedule(() =>
-    puppeteerGetInner(url, refererUrl, headful)
-  );
-};
+getQueue.on("add", () => {
+  const queueSize = getQueue.size;
+  if ((queueSize + 1) % 100 == 0)
+    console.error("getQueue size:", queueSize - 1);
+});
 
 // much of this function comes from the npm package "pupflare"
 const puppeteerGetInner = async (
@@ -139,8 +134,8 @@ const puppeteerGetInner = async (
     !allBrowsersCreated ||
     (headful ? availableHeadfulBrowsers : availableHeadlessBrowsers).length == 0
   ) {
-    console.log("no browsers available for url", url, "waiting");
-    await delay(Math.random() * 2500);
+    // console.log("no browsers available for url", url, "waiting");
+    await delay(Math.random() * 1000);
   }
 
   const currBrowser = (
@@ -157,7 +152,7 @@ const puppeteerGetInner = async (
     console.error("No PID for browser scraping url ", url);
     return;
   }
-  // await delay(SCRAPE_DELAY);
+  await delay(SCRAPE_DELAY);
   inProgressUrls.add(url);
   const fullUrl = BASE_URL + url;
   console.log("Scraping", fullUrl);
@@ -265,8 +260,14 @@ const puppeteerGetInner = async (
       error.toString().includes("ERR_TIMED_OUT") ||
       error.toString().includes("ERR_EMPTY_RESPONSE")
     ) {
+      console.error(
+        `Browser fetching ${url} timed out for ${
+          browserDict[currBrowser.process().pid].numTimeouts + 1
+        } time`
+      );
       if (browserDict[currBrowser.process().pid].numTimeouts < 3) {
         browserDict[currBrowser.process().pid].numTimeouts++;
+        if (page) page.close();
       } else {
         console.error(
           `Browser fetching url ${url} timed out for the third time: (${error.toString()}), removing it from the pool now.`
@@ -289,5 +290,11 @@ const puppeteerGetInner = async (
   inProgressUrls.delete(url);
   return responseBody;
 };
+
+const puppeteerGet = async (
+  url: string,
+  refererUrl?: string,
+  headful: boolean = false
+) => await getQueue.add(() => puppeteerGetInner(url, refererUrl, headful));
 
 export default puppeteerGet;

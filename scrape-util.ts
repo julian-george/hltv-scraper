@@ -1,9 +1,25 @@
 import { Query } from "mongoose";
+import PQueue from "p-queue";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const MAX_QUERY_TIME = 20000;
 const MAX_QUERY_WAIT = 1500;
 const MIN_QUERY_WAIT = 200;
 const RETRY_NUM = 5;
+const BROWSER_LIMIT = Number(process.env.BROWSER_LIMIT) || 1;
+const MAX_CONCURRENT_QUERIES = BROWSER_LIMIT * 2;
+
+const queryQueue = new PQueue({
+  concurrency: MAX_CONCURRENT_QUERIES * 1.25,
+});
+
+queryQueue.on("add", () => {
+  const queueSize = queryQueue.size;
+  if ((queueSize + 1) % 100 == 0)
+    console.error("queryQueue size:", queueSize - 1);
+});
 
 export const delay = (ms: number, maxDelay: number = 1500) =>
   new Promise((resolve) => {
@@ -15,7 +31,9 @@ export const delay = (ms: number, maxDelay: number = 1500) =>
 export const queryWrapper = async (query: Query<any, any, any, any>) => {
   for (let i = 0; i < RETRY_NUM; i++) {
     try {
-      const queryResult = await query.maxTimeMS(MAX_QUERY_TIME);
+      const queryResult = await queryQueue.add(() =>
+        query.maxTimeMS(MAX_QUERY_TIME)
+      );
       return queryResult || null;
     } catch (err) {
       err = err.toString().toLowerCase();

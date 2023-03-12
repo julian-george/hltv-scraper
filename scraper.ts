@@ -1,5 +1,6 @@
 import fs from "fs";
 import dotenv from "dotenv";
+import PQueue from "p-queue";
 import { CheerioAPI, load } from "cheerio";
 import { createEvent, getEventByHltvId } from "./services/event-service";
 import { createPlayer, getPlayerByHltvId } from "./services/player-service";
