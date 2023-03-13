@@ -12,13 +12,16 @@ const BROWSER_LIMIT = Number(process.env.BROWSER_LIMIT) || 1;
 const MAX_CONCURRENT_QUERIES = BROWSER_LIMIT * 2;
 
 const queryQueue = new PQueue({
-  concurrency: MAX_CONCURRENT_QUERIES * 1.25,
+  concurrency: MAX_CONCURRENT_QUERIES,
 });
 
 queryQueue.on("add", () => {
   const queueSize = queryQueue.size;
   if ((queueSize + 1) % 100 == 0)
     console.error("queryQueue size:", queueSize - 1);
+  const numPending = queryQueue.pending;
+  if ((numPending + 1) % 25 == 0)
+    console.error("num queries pending:", numPending - 1);
 });
 
 export const delay = (ms: number, maxDelay: number = 1500) =>

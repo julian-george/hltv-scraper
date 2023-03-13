@@ -15,10 +15,9 @@ const CACHED = !!process.env.SCRAPE_CACHED;
   if (!MONGODB_URI) throw new Error("No MongoDB URI given.");
   await mongoose
     .connect(MONGODB_URI, {
-      socketTimeoutMS: 30000,
-      serverSelectionTimeoutMS: 30000,
+      socketTimeoutMS: 10000,
+      serverSelectionTimeoutMS: 10000,
       maxPoolSize: 2048,
-      minPoolSize: 128,
     })
     .then(() => {
       console.log("Connected to MongoDB");

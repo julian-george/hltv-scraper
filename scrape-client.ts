@@ -161,6 +161,18 @@ const puppeteerGetInner = async (
   let responseHeaders;
   let responseUrl;
   let page;
+  let retry = async (removed: boolean = false) => {
+    if (!removed) {
+      (headful ? availableHeadfulBrowsers : availableHeadlessBrowsers).push(
+        currBrowser
+      );
+      page.close().catch((err) => {
+        console.error(`Error while closing page for URL ${url}`, err);
+      });
+    }
+    inProgressUrls.delete(url);
+    return await puppeteerGet(url, refererUrl, headful);
+  };
   try {
     page = await currBrowser.newPage();
     if (refererUrl)
@@ -189,8 +201,6 @@ const puppeteerGetInner = async (
         waitUntil: "domcontentloaded",
       });
     } catch (err) {
-      // console.error(`Unable to open page ${url}`, err);
-      puppeteerGet(url, refererUrl, headful);
       throw err;
     }
     responseBody = await response.text();
@@ -217,8 +227,19 @@ const puppeteerGetInner = async (
         console.error("Error while removing browser", err);
       }
 
-      return await puppeteerGet(url, refererUrl, headful);
+      return await retry(true);
     }
+    // TODO: what happens when I get hcaptcha on everything?
+    // if (responseBody.includes(`class="hcaptcha-box"`)) {
+    //   console.error(`Browser fetching url ${url} encountered hcaptcha.`);
+    //   try {
+    //     await removeBrowser(currBrowser, headful, url);
+    //   } catch (err) {
+    //     console.error("Error while removing browser", err);
+    //   }
+
+    //   return await retry(true);
+    // }
     while (
       responseBody.includes("challenge-running") &&
       tryCount < MAX_CHALLENGE_TRIES
@@ -242,48 +263,39 @@ const puppeteerGetInner = async (
       console.error(
         `Unable to beat challenge for url ${url}, retrying with new browser`
       );
-      (headful ? availableHeadfulBrowsers : availableHeadlessBrowsers).push(
-        currBrowser
-      );
-      inProgressUrls.delete(url);
-      return await puppeteerGet(url, refererUrl, true);
+
+      return await retry();
     }
     // if (tryCount > 0) console.log(`Beat challenge after ${tryCount} tries`);
     // responseHeaders = await response.headers();
     // responseHeadersToRemove.forEach((header) => delete responseHeaders[header]);
     // console.log("about to close");
-    page.close().catch((err) => {
-      console.error(`Error while closing page for URL ${url}`, err);
-    });
   } catch (error) {
     if (
       error.toString().includes("ERR_TIMED_OUT") ||
-      error.toString().includes("ERR_EMPTY_RESPONSE")
+      error.toString().includes("ERR_EMPTY_RESPONSE") ||
+      error.toString().includes("ERR_CONNECTION_FAILED") ||
+      error.toString().includes("ERR_CONNECTION_CLOSED")
     ) {
       console.error(
         `Browser fetching ${url} timed out for ${
           browserDict[currBrowser.process().pid].numTimeouts + 1
         } time`
       );
-      if (browserDict[currBrowser.process().pid].numTimeouts < 3) {
+      if (browserDict[currBrowser.process().pid].numTimeouts < 5) {
         browserDict[currBrowser.process().pid].numTimeouts++;
-        if (page) page.close();
+        return await retry();
       } else {
         console.error(
           `Browser fetching url ${url} timed out for the third time: (${error.toString()}), removing it from the pool now.`
         );
-        await removeBrowser(currBrowser, headful, url);
+        return await retry(true);
       }
-      return await puppeteerGet(url, refererUrl, headful);
-    } else if (error.toString().includes("ERR_CONNECTION_CLOSED")) {
-      console.error(`Browser fetching ${url} failed to connect, retrying.`);
-      (headful ? availableHeadfulBrowsers : availableHeadlessBrowsers).push(
-        currBrowser
-      );
-      if (page) page.close();
-      return await puppeteerGet(url, refererUrl, headful);
     }
   }
+  page.close().catch((err) => {
+    console.error(`Error while closing page for URL ${url}`, err);
+  });
   (headful ? availableHeadfulBrowsers : availableHeadlessBrowsers).push(
     currBrowser
   );
