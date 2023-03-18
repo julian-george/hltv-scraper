@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "npx ts-node index.ts",
     "build": "npx tsc",
-    "start": "node --max-old-space-size=8192 dist/index.js",
+    "start": "node --max-old-space-size=6144 dist/index.js",
     "log": "yarn start > log.txt 2> error-log.txt",
     "clean": "rm -rf dist/**"
   },
@@ -19,7 +19,7 @@
     "lodash": "^4.17.21",
     "mongoose": "^6.7.5",
     "node": "^19.2.0",
-    "p-queue": "6.6.2",
+    "p-queue": "^7.3.4",
     "proxy-chain": "^2.2.0",
     "puppeteer": "18.1.0",
     "puppeteer-extra": "^3.3.4",

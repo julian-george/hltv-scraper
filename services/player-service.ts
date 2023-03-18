@@ -1,5 +1,5 @@
 import Player, { playerSchema } from "../models/Player";
-import { queryWrapper } from "../scrape-util";
+import { queryWrapper, insertWrapper } from "../scrape-util";
 
 export const getPlayerByHltvId = async (id: number) => {
   const player = await queryWrapper(Player.findOne({ hltvId: id }));
@@ -8,5 +8,5 @@ export const getPlayerByHltvId = async (id: number) => {
 };
 
 export const createPlayer = async (player) => {
-  return await Player.create(player);
+  return await insertWrapper(Player.create(player));
 };

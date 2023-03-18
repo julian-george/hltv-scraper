@@ -1,5 +1,5 @@
 import Map, { mapSchema } from "../models/Map";
-import { queryWrapper } from "../scrape-util";
+import { queryWrapper, insertWrapper } from "../scrape-util";
 
 export const getMapByHltvId = async (id: number) => {
   const map = await queryWrapper(Map.findOne({ hltvId: id }));
@@ -8,5 +8,5 @@ export const getMapByHltvId = async (id: number) => {
 };
 
 export const createMap = async (map) => {
-  return await Map.create(map);
+  return await insertWrapper(Map.create(map));
 };

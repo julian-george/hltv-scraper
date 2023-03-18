@@ -1,5 +1,5 @@
 import Match, { matchSchema } from "../models/Match";
-import { queryWrapper } from "../scrape-util";
+import { queryWrapper, insertWrapper } from "../scrape-util";
 
 export const getMatchByHltvId = async (id: number) => {
   const match = await queryWrapper(Match.findOne({ hltvId: id }));
@@ -8,5 +8,5 @@ export const getMatchByHltvId = async (id: number) => {
 };
 
 export const createMatch = async (match) => {
-  return await Match.create(match);
+  return await insertWrapper(Match.create(match));
 };

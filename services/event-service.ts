@@ -1,5 +1,5 @@
 import Event, { eventSchema } from "../models/Event";
-import { queryWrapper } from "../scrape-util";
+import { queryWrapper, insertWrapper } from "../scrape-util";
 
 export const getEventByHltvId = async (id: number) => {
   const event = await queryWrapper(Event.findOne({ hltvId: id }));
@@ -8,5 +8,5 @@ export const getEventByHltvId = async (id: number) => {
 };
 
 export const createEvent = async (event) => {
-  return await Event.create(event);
+  return await insertWrapper(Event.create(event));
 };

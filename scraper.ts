@@ -238,11 +238,7 @@ export const parseMatch = async (
       matchType,
     });
   } catch (err) {
-    if (err.toString().includes("E11000")) {
-      console.log("Duplicate match", hltvId);
-    } else {
-      throw new Error(`Unable to add match ID ${hltvId} to the database:`, err);
-    }
+    throw new Error(`Unable to add match ID ${hltvId} to the database:`, err);
   }
 };
 
@@ -406,14 +402,7 @@ const parseMap = async (
         teamTwoStats,
       });
     } catch (err) {
-      if (err.toString().includes("E11000")) {
-        // console.log("Duplicate event ", hltvId);
-      } else {
-        throw new Error(
-          "Unable to add map ID " + hltvId + " to database: ",
-          err
-        );
-      }
+      throw new Error("Unable to add map ID " + hltvId + " to database: ", err);
     }
 };
 
@@ -565,14 +554,10 @@ const parseEvent = async ($: CheerioAPI, eventId: number) => {
         teamRankings,
       });
     } catch (err) {
-      if (err.toString().includes("E11000")) {
-        // console.log("Duplicate event ", hltvId);
-      } else {
-        throw new Error(
-          "Unable to add event ID " + hltvId + " to database: ",
-          err
-        );
-      }
+      throw new Error(
+        "Unable to add event ID " + hltvId + " to database: ",
+        err
+      );
     }
 };
 
@@ -610,14 +595,10 @@ const parsePlayer = async ($: CheerioAPI, playerId: number) => {
     try {
       return await createPlayer({ hltvId, name, birthYear, nationality });
     } catch (err) {
-      if (err.toString().includes("E11000")) {
-        // console.error("Duplicate player", hltvId);
-      } else {
-        throw new Error(
-          "Unable to add player ID " + hltvId + " to database: ",
-          err
-        );
-      }
+      throw new Error(
+        "Unable to add player ID " + hltvId + " to database: ",
+        err
+      );
     }
 };
 
