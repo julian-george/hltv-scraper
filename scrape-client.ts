@@ -19,6 +19,18 @@ const FORCE_HEADLESS = process.env.FORCE_HEADLESS;
 const SCRAPE_DELAY = Number(process.env.SCRAPE_DELAY) || 0;
 const WEBSHARE = !!process.env.WEBSHARE;
 
+const SCREEN_HEIGHT = 1400;
+const SCREEN_WIDTH = 1680;
+// These settings are horribly broken due to chromium's unpredictable "window-size" behavior, just trial and error
+const MAX_WINDOW_COLS = 4;
+const NUM_WINDOW_ROWS = 9;
+// const WINDOW_WIDTH = SCREEN_WIDTH / (BROWSER_LIMIT / NUM_WINDOW_ROWS);
+const WINDOW_WIDTH = Math.round(SCREEN_WIDTH / MAX_WINDOW_COLS);
+// const WINDOW_HEIGHT = SCREEN_HEIGHT / NUM_WINDOW_ROWS;
+const WINDOW_HEIGHT = Math.round(SCREEN_HEIGHT / NUM_WINDOW_ROWS);
+const WINDOW_SIZE_FLAG = `--window-size=${WINDOW_WIDTH},${WINDOW_HEIGHT}`;
+console.log(WINDOW_SIZE_FLAG);
+
 events.EventEmitter.defaultMaxListeners = BROWSER_LIMIT + 5;
 
 puppeteer.use(StealthPlugin());
@@ -47,11 +59,11 @@ let availableHeadlessBrowsers: Browser[] = [];
 let availableHeadfulBrowsers: Browser[] = [];
 const browserDict: Record<
   string,
-  { ip: string; anonymizedIp: string; numTimeouts: number }
+  { ip: string; anonymizedIp: string; numTimeouts: number; slot: number }
 > = {};
 
 let inProgressUrls: Set<string> = new Set();
-
+let emptySlots: number[] = [];
 let allBrowsersCreated = false;
 
 const addNewBrowser = async (headful: boolean) => {
@@ -59,19 +71,30 @@ const addNewBrowser = async (headful: boolean) => {
     console.error("No more IPs available");
     return;
   }
+  const slot = emptySlots.pop();
+  const positionFlag = `--window-position=${
+    (slot % MAX_WINDOW_COLS) * WINDOW_WIDTH
+  },${Math.floor(slot / MAX_WINDOW_COLS) * WINDOW_HEIGHT}`;
   const ip = ips.pop();
   const anonymizedIp = await anonymizeProxy("http://" + ip);
-  const proxyString = `--proxy-server=${anonymizedIp}`;
+  const proxyFlag = `--proxy-server=${anonymizedIp}`;
   const newBrowser = await puppeteer.launch({
     headless: !headful,
     args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-gpu",
-      proxyString,
+      // "--no-sandbox",
+      // "--disable-setuid-sandbox",
+      // "--disable-gpu",
+      WINDOW_SIZE_FLAG,
+      positionFlag,
+      proxyFlag,
     ],
   });
-  browserDict[newBrowser.process().pid] = { ip, anonymizedIp, numTimeouts: 0 };
+  browserDict[newBrowser.process().pid] = {
+    ip,
+    anonymizedIp,
+    numTimeouts: 0,
+    slot,
+  };
   (!headful ? availableHeadlessBrowsers : availableHeadfulBrowsers).push(
     newBrowser
   );
@@ -80,6 +103,7 @@ const addNewBrowser = async (headful: boolean) => {
 (async () => {
   const browserAdditions: Promise<void>[] = [];
   for (let i = 0; i < BROWSER_LIMIT; i++) {
+    emptySlots.push(i);
     const headful = i < NUM_HEADFUL;
     browserAdditions.push(addNewBrowser(headful));
   }
@@ -93,6 +117,7 @@ const removeBrowser = async (currBrowser, headful, url) => {
     currBrowser.process().pid,
     browserDict[currBrowser.process().pid]
   );
+  emptySlots.push(browserDict[currBrowser.process().pid].slot);
   try {
     currBrowser
       .close()
@@ -111,7 +136,7 @@ const removeBrowser = async (currBrowser, headful, url) => {
 };
 
 const getQueue = new PQueue({
-  concurrency: BROWSER_LIMIT * 2,
+  concurrency: BROWSER_LIMIT,
 });
 
 getQueue.on("add", () => {
@@ -135,7 +160,7 @@ const puppeteerGetInner = async (
     (headful ? availableHeadfulBrowsers : availableHeadlessBrowsers).length == 0
   ) {
     // console.log("no browsers available for url", url, "waiting");
-    await delay(Math.random() * 1000);
+    await delay(0, 750);
   }
 
   const currBrowser = (
@@ -161,7 +186,10 @@ const puppeteerGetInner = async (
   let responseHeaders;
   let responseUrl;
   let page;
-  let retry = async (removed: boolean = false) => {
+  let conclude = async (
+    removed: boolean = false,
+    toReturn: any = undefined
+  ) => {
     if (!removed) {
       (headful ? availableHeadfulBrowsers : availableHeadlessBrowsers).push(
         currBrowser
@@ -171,7 +199,11 @@ const puppeteerGetInner = async (
       });
     }
     inProgressUrls.delete(url);
-    return await puppeteerGet(url, refererUrl, headful);
+    if (!(toReturn === undefined)) {
+      return toReturn;
+    } else {
+      return await puppeteerGetInner(url, refererUrl, headful);
+    }
   };
   try {
     page = await currBrowser.newPage();
@@ -212,7 +244,7 @@ const puppeteerGetInner = async (
       responseBody.includes("500")
     ) {
       console.error(`Server error 500 for url ${url}`);
-      return null;
+      return await conclude(false, null);
     }
     if (
       !responseBody.includes("challenge-running") &&
@@ -227,7 +259,7 @@ const puppeteerGetInner = async (
         console.error("Error while removing browser", err);
       }
 
-      return await retry(true);
+      return await conclude(true);
     }
     // TODO: what happens when I get hcaptcha on everything?
     // if (responseBody.includes(`class="hcaptcha-box"`)) {
@@ -264,7 +296,7 @@ const puppeteerGetInner = async (
         `Unable to beat challenge for url ${url}, retrying with new browser`
       );
 
-      return await retry();
+      return await conclude();
     }
     // if (tryCount > 0) console.log(`Beat challenge after ${tryCount} tries`);
     // responseHeaders = await response.headers();
@@ -282,25 +314,28 @@ const puppeteerGetInner = async (
           browserDict[currBrowser.process().pid].numTimeouts + 1
         } time`
       );
-      if (browserDict[currBrowser.process().pid].numTimeouts < 5) {
+      if (browserDict[currBrowser.process().pid].numTimeouts < 8) {
         browserDict[currBrowser.process().pid].numTimeouts++;
-        return await retry();
+        return await conclude();
       } else {
         console.error(
-          `Browser fetching url ${url} timed out for the third time: (${error.toString()}), removing it from the pool now.`
+          `Browser fetching url ${url} timed out too many times, removing it from the pool now.`
         );
-        return await retry(true);
+        try {
+          await removeBrowser(currBrowser, headful, url);
+        } catch (err) {
+          console.error("Error while removing browser", err);
+        }
+        return await conclude(true);
       }
+    } else {
+      console.error(
+        `Browser fetching ${url} encountered unknown error:`,
+        error
+      );
     }
   }
-  page.close().catch((err) => {
-    console.error(`Error while closing page for URL ${url}`, err);
-  });
-  (headful ? availableHeadfulBrowsers : availableHeadlessBrowsers).push(
-    currBrowser
-  );
-  inProgressUrls.delete(url);
-  return responseBody;
+  return await conclude(false, responseBody);
 };
 
 const puppeteerGet = async (
@@ -310,3 +345,20 @@ const puppeteerGet = async (
 ) => await getQueue.add(() => puppeteerGetInner(url, refererUrl, headful));
 
 export default puppeteerGet;
+
+[
+  `exit`,
+  `SIGINT`,
+  `SIGUSR1`,
+  `SIGUSR2`,
+  `uncaughtException`,
+  `SIGTERM`,
+].forEach((eventType) => {
+  process.on(eventType, () => {
+    console.log("getQueue info: ");
+    console.log(`num pending: ${getQueue.pending}`);
+    console.log(`size: ${getQueue.size}`);
+    console.log(`isPaused: ${getQueue.isPaused}`);
+    process.kill(process.pid);
+  });
+});
