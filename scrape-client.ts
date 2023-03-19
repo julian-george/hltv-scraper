@@ -5,9 +5,9 @@ import dotenv from "dotenv";
 import { Browser } from "puppeteer";
 import PQueue from "p-queue";
 import { anonymizeProxy } from "proxy-chain";
-import { shuffle } from "lodash";
+import _ from "lodash";
 import events from "events";
-import { delay } from "./scrape-util";
+import { delay } from "./scrape-util.js";
 import "log-timestamp";
 
 dotenv.config();
@@ -46,7 +46,7 @@ const responseHeadersToRemove = [
 
 const BASE_URL = "https://www.hltv.org";
 
-let ips: string[] = shuffle(
+let ips: string[] = _.shuffle(
   fs.readFileSync("ips.txt", { encoding: "utf8" }).split("\n")
 );
 if (WEBSHARE)
@@ -346,19 +346,17 @@ const puppeteerGet = async (
 
 export default puppeteerGet;
 
-[
-  `exit`,
-  `SIGINT`,
-  `SIGUSR1`,
-  `SIGUSR2`,
-  `uncaughtException`,
-  `SIGTERM`,
-].forEach((eventType) => {
+["exit"].forEach((eventType) => {
   process.on(eventType, () => {
-    console.log("getQueue info: ");
-    console.log(`num pending: ${getQueue.pending}`);
-    console.log(`size: ${getQueue.size}`);
-    console.log(`isPaused: ${getQueue.isPaused}`);
+    console.error("getQueue info: ");
+    console.error(`num pending: ${getQueue.pending}`);
+    console.error(`size: ${getQueue.size}`);
+    console.error(`isPaused: ${getQueue.isPaused}`);
+    console.error(`inProgressUrls size: ${inProgressUrls.size}`);
+    console.error(`browserDict: ${browserDict}`);
+    console.error(
+      `availableHeadfulBrowsers size ${availableHeadfulBrowsers.length}`
+    );
     process.kill(process.pid);
   });
 });

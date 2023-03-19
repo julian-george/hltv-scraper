@@ -2,11 +2,12 @@
   "name": "hltv-scraper",
   "version": "1.0.0",
   "description": "",
-  "main": "index.ts",
+  "main": "index.js",
+  "type": "module",
   "scripts": {
     "dev": "npx ts-node index.ts",
     "build": "npx tsc",
-    "start": "node --max-old-space-size=6144 dist/index.js",
+    "start": "node --max-old-space-size=6144 --experimental-specifier-resolution=node --trace-warnings dist/index.js",
     "log": "yarn start > log.txt 2> error-log.txt",
     "clean": "rm -rf dist/**"
   },
@@ -29,6 +30,7 @@
   },
   "devDependencies": {
     "@types/axios": "^0.14.0",
+    "@types/lodash": "^4.14.191",
     "@types/node": "^18.11.10",
     "log-timestamp": "^0.3.0",
     "ts-node": "^10.9.1",

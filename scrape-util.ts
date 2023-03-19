@@ -31,11 +31,11 @@ export const delay = (ms: number, maxDelay: number = 1500) =>
     }, Math.random() * maxDelay + ms);
   });
 
-export const queryWrapper = async (query: Query<any, any, any, any>) => {
+export const queryWrapper = async (query: () => Query<any, any, any, any>) => {
   for (let i = 0; i < RETRY_NUM; i++) {
     try {
       const queryResult = await queryQueue.add(() =>
-        query.maxTimeMS(MAX_QUERY_TIME)
+        query().maxTimeMS(MAX_QUERY_TIME)
       );
       return queryResult || null;
     } catch (err) {
@@ -47,7 +47,7 @@ export const queryWrapper = async (query: Query<any, any, any, any>) => {
         err.includes("mongoservererror: operation exceeded time limit")
       ) {
         console.error(`Timeout on try ${i}:`, err);
-        query = query.clone();
+        // query = query.clone();
         // Short variable delay to prevent clumping of queries at static intervals
         await delay(MIN_QUERY_WAIT, MAX_QUERY_WAIT - MIN_QUERY_WAIT);
       } else {
@@ -59,14 +59,16 @@ export const queryWrapper = async (query: Query<any, any, any, any>) => {
   }
 };
 
-export const insertWrapper = async (insert: Promise<any>) => {
+const errorPromise = () => new Promise((resolve, reject) => reject("Fuck"));
+
+export const insertWrapper = async (insert: () => Promise<any>) => {
   try {
-    const insertResult = await queryQueue.add(() => insert);
+    const insertResult = await queryQueue.add(insert);
     return insertResult || null;
   } catch (err) {
     err = err.toString().toLowerCase();
     if (err.includes("e11000")) {
-      console.log("Duplicate insert: ", err);
+      // console.log("Duplicate insert: ", err);
       return null;
     } else {
       console.error(`Insert error:`, err);
@@ -75,19 +77,12 @@ export const insertWrapper = async (insert: Promise<any>) => {
   }
 };
 
-[
-  `exit`,
-  `SIGINT`,
-  `SIGUSR1`,
-  `SIGUSR2`,
-  `uncaughtException`,
-  `SIGTERM`,
-].forEach((eventType) => {
+["exit"].forEach((eventType) => {
   process.on(eventType, () => {
-    console.log("queryQueue info: ");
-    console.log(`num pending: ${queryQueue.pending}`);
-    console.log(`size: ${queryQueue.size}`);
-    console.log(`isPaused: ${queryQueue.isPaused}`);
+    console.error("queryQueue info: ");
+    console.error(`num pending: ${queryQueue.pending}`);
+    console.error(`size: ${queryQueue.size}`);
+    console.error(`isPaused: ${queryQueue.isPaused}`);
     process.kill(process.pid);
   });
 });

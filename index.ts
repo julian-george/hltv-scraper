@@ -1,9 +1,10 @@
 import fs from "fs";
 import { load } from "cheerio";
 import mongoose from "mongoose";
+// mongoose.set("debug", true);
 import dotenv from "dotenv";
-import { parseResults } from "./scraper";
-import puppeteerGet from "./scrape-client";
+import { parseResults } from "./scraper.js";
+import puppeteerGet from "./scrape-client.js";
 
 dotenv.config();
 

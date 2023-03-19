@@ -2,11 +2,11 @@ import fs from "fs";
 import dotenv from "dotenv";
 import PQueue from "p-queue";
 import { CheerioAPI, load } from "cheerio";
-import { createEvent, getEventByHltvId } from "./services/event-service";
-import { createPlayer, getPlayerByHltvId } from "./services/player-service";
-import { createMap, getMapByHltvId } from "./services/map-service";
-import { createMatch, getMatchByHltvId } from "./services/match-service";
-import puppeteerGet from "./scrape-client";
+import { createEvent, getEventByHltvId } from "./services/event-service.js";
+import { createPlayer, getPlayerByHltvId } from "./services/player-service.js";
+import { createMap, getMapByHltvId } from "./services/map-service.js";
+import { createMatch, getMatchByHltvId } from "./services/match-service.js";
+import puppeteerGet from "./scrape-client.js";
 
 dotenv.config();
 
@@ -657,12 +657,12 @@ export const parseResults = async ($: CheerioAPI, resultsUrl: string) => {
     });
   }
   const resultStart = Date.now();
-  // // For debug: if you ever want to test matches sequentially
-  // for (const executor of resultExecutors){
-  //   await executor()
-  // }
-  const resultPromises = resultExecutors.map((executor) => executor());
-  await Promise.all(resultPromises);
+  // For debug: if you ever want to test matches sequentially
+  for (const executor of resultExecutors) {
+    await executor();
+  }
+  // const resultPromises = resultExecutors.map((executor) => executor());
+  // await Promise.all(resultPromises);
   const resultEnd = Date.now();
   const resultElapsed = Math.round((resultEnd - resultStart) / 10) / 100;
   console.log(
