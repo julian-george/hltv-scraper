@@ -8,5 +8,5 @@ export const getMatchByHltvId = async (id: number) => {
 };
 
 export const createMatch = async (match) => {
-  return await insertWrapper(() => Match.create(match));
+  return await insertWrapper(() => new Match(match).save());
 };

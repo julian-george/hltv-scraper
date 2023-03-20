@@ -8,5 +8,5 @@ export const getPlayerByHltvId = async (id: number) => {
 };
 
 export const createPlayer = async (player) => {
-  return await insertWrapper(() => Player.create(player));
+  return await insertWrapper(() => new Player(player).save());
 };

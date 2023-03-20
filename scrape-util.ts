@@ -59,8 +59,6 @@ export const queryWrapper = async (query: () => Query<any, any, any, any>) => {
   }
 };
 
-const errorPromise = () => new Promise((resolve, reject) => reject("Fuck"));
-
 export const insertWrapper = async (insert: () => Promise<any>) => {
   for (let i = 0; i < RETRY_NUM; i++) {
     try {
@@ -70,7 +68,7 @@ export const insertWrapper = async (insert: () => Promise<any>) => {
       err = err.toString().toLowerCase();
       if (err.includes("e11000")) {
         if (i == 0) {
-          console.log("Duplicate insert: ", err);
+          console.log("Duplicate insert:", err);
           return null;
         }
         return true;

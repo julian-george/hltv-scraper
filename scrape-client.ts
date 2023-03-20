@@ -254,12 +254,7 @@ const puppeteerGetInner = async (
       console.error(
         `Browser fetching url ${url} was blocked, removing it from the pool now.`
       );
-      try {
-        await removeBrowser(currBrowser, headful, url);
-      } catch (err) {
-        console.error("Error while removing browser", err);
-      }
-
+      await removeBrowser(currBrowser, headful, url);
       return await conclude(true);
     }
     // TODO: what happens when I get hcaptcha on everything?
@@ -322,13 +317,13 @@ const puppeteerGetInner = async (
         console.error(
           `Browser fetching url ${url} timed out too many times, removing it from the pool now.`
         );
-        try {
-          await removeBrowser(currBrowser, headful, url);
-        } catch (err) {
-          console.error("Error while removing browser", err);
-        }
+        await removeBrowser(currBrowser, headful, url);
         return await conclude(true);
       }
+    } else if (error.toString().includes("ERR_TUNNEL_CONNECTION_FAILED")) {
+      console.error(`Proxy connection failed for browser fetching ${url}`);
+      await removeBrowser(currBrowser, headful, url);
+      return await conclude(true);
     } else {
       console.error(
         `Browser fetching ${url} encountered unknown error:`,

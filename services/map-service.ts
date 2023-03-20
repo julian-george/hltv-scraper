@@ -8,5 +8,5 @@ export const getMapByHltvId = async (id: number) => {
 };
 
 export const createMap = async (map) => {
-  return await insertWrapper(() => Map.create(map));
+  return await insertWrapper(() => new Map(map).save());
 };
