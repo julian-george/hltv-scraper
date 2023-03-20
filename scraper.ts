@@ -1,6 +1,5 @@
 import fs from "fs";
 import dotenv from "dotenv";
-import PQueue from "p-queue";
 import { CheerioAPI, load } from "cheerio";
 import { createEvent, getEventByHltvId } from "./services/event-service.js";
 import { createPlayer, getPlayerByHltvId } from "./services/player-service.js";
@@ -658,11 +657,11 @@ export const parseResults = async ($: CheerioAPI, resultsUrl: string) => {
   }
   const resultStart = Date.now();
   // For debug: if you ever want to test matches sequentially
-  for (const executor of resultExecutors) {
-    await executor();
-  }
-  // const resultPromises = resultExecutors.map((executor) => executor());
-  // await Promise.all(resultPromises);
+  // for (const executor of resultExecutors) {
+  //   await executor();
+  // }
+  const resultPromises = resultExecutors.map((executor) => executor());
+  await Promise.all(resultPromises);
   const resultEnd = Date.now();
   const resultElapsed = Math.round((resultEnd - resultStart) / 10) / 100;
   console.log(

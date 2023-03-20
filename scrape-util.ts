@@ -46,7 +46,7 @@ export const queryWrapper = async (query: () => Query<any, any, any, any>) => {
         // or if it went over the maxTimeMS set above
         err.includes("mongoservererror: operation exceeded time limit")
       ) {
-        console.error(`Timeout on try ${i}:`, err);
+        console.error(`Query timeout on try ${i}:`, err);
         // query = query.clone();
         // Short variable delay to prevent clumping of queries at static intervals
         await delay(MIN_QUERY_WAIT, MAX_QUERY_WAIT - MIN_QUERY_WAIT);
@@ -62,17 +62,25 @@ export const queryWrapper = async (query: () => Query<any, any, any, any>) => {
 const errorPromise = () => new Promise((resolve, reject) => reject("Fuck"));
 
 export const insertWrapper = async (insert: () => Promise<any>) => {
-  try {
-    const insertResult = await queryQueue.add(insert);
-    return insertResult || null;
-  } catch (err) {
-    err = err.toString().toLowerCase();
-    if (err.includes("e11000")) {
-      // console.log("Duplicate insert: ", err);
-      return null;
-    } else {
-      console.error(`Insert error:`, err);
-      throw err;
+  for (let i = 0; i < RETRY_NUM; i++) {
+    try {
+      const insertResult = await queryQueue.add(insert);
+      return insertResult || null;
+    } catch (err) {
+      err = err.toString().toLowerCase();
+      if (err.includes("e11000")) {
+        if (i == 0) {
+          console.log("Duplicate insert: ", err);
+          return null;
+        }
+        return true;
+      } else if (err.includes("timed out")) {
+        console.error(`Insert timeout on try ${i}:`, err);
+        await delay(MIN_QUERY_WAIT, MAX_QUERY_WAIT - MIN_QUERY_WAIT);
+      } else {
+        console.error(`Insert error:`, err);
+        throw err;
+      }
     }
   }
 };
@@ -83,6 +91,5 @@ export const insertWrapper = async (insert: () => Promise<any>) => {
     console.error(`num pending: ${queryQueue.pending}`);
     console.error(`size: ${queryQueue.size}`);
     console.error(`isPaused: ${queryQueue.isPaused}`);
-    process.kill(process.pid);
   });
 });

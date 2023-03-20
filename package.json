@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "npx ts-node index.ts",
     "build": "npx tsc",
-    "start": "node --max-old-space-size=6144 --experimental-specifier-resolution=node --trace-warnings dist/index.js",
+    "start": "node --max-old-space-size=6144 --trace-warnings dist/index.js",
     "log": "yarn start > log.txt 2> error-log.txt",
     "clean": "rm -rf dist/**"
   },

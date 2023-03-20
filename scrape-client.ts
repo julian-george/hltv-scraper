@@ -9,6 +9,7 @@ import _ from "lodash";
 import events from "events";
 import { delay } from "./scrape-util.js";
 import "log-timestamp";
+import util from "node:util";
 
 dotenv.config();
 const NUM_HEADFUL = Number(process.env.NUM_HEADFUL);
@@ -353,10 +354,9 @@ export default puppeteerGet;
     console.error(`size: ${getQueue.size}`);
     console.error(`isPaused: ${getQueue.isPaused}`);
     console.error(`inProgressUrls size: ${inProgressUrls.size}`);
-    console.error(`browserDict: ${browserDict}`);
+    console.error(`browserDict: ${util.inspect(browserDict)}`);
     console.error(
       `availableHeadfulBrowsers size ${availableHeadfulBrowsers.length}`
     );
-    process.kill(process.pid);
   });
 });
