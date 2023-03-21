@@ -23,6 +23,7 @@ process.on("SIGINT", () => {
   if (!MONGODB_URI) throw new Error("No MongoDB URI given.");
   try {
     connection = await mongoose.connect(MONGODB_URI, {
+      keepAlive: true,
       socketTimeoutMS: 10000,
       serverSelectionTimeoutMS: 10000,
       maxPoolSize: 2048,
