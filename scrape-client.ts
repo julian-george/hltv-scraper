@@ -60,7 +60,14 @@ let availableHeadlessBrowsers: Browser[] = [];
 let availableHeadfulBrowsers: Browser[] = [];
 const browserDict: Record<
   string,
-  { ip: string; anonymizedIp: string; numTimeouts: number; slot: number }
+  {
+    ip: string;
+    anonymizedIp: string;
+    numTimeouts: number;
+    slot: number;
+    currentUrl: string | null;
+    addedDatetime: Date;
+  }
 > = {};
 
 let inProgressUrls: Set<string> = new Set();
@@ -95,6 +102,8 @@ const addNewBrowser = async (headful: boolean) => {
     anonymizedIp,
     numTimeouts: 0,
     slot,
+    currentUrl: null,
+    addedDatetime: new Date(),
   };
   (!headful ? availableHeadlessBrowsers : availableHeadfulBrowsers).push(
     newBrowser
@@ -160,7 +169,7 @@ const puppeteerGetInner = async (
     !allBrowsersCreated ||
     (headful ? availableHeadfulBrowsers : availableHeadlessBrowsers).length == 0
   ) {
-    // console.log("no browsers available for url", url, "waiting");
+    console.log("no browsers available for url", url, "waiting");
     await delay(0, 750);
   }
 
@@ -178,6 +187,11 @@ const puppeteerGetInner = async (
     console.error("No PID for browser scraping url ", url);
     return;
   }
+
+  const browserId = currBrowser.process().pid;
+
+  browserDict[browserId].currentUrl = url;
+
   await delay(SCRAPE_DELAY);
   inProgressUrls.add(url);
   const fullUrl = BASE_URL + url;
@@ -195,11 +209,13 @@ const puppeteerGetInner = async (
       (headful ? availableHeadfulBrowsers : availableHeadlessBrowsers).push(
         currBrowser
       );
-      page.close().catch((err) => {
-        console.error(`Error while closing page for URL ${url}`, err);
-      });
+      if (page)
+        page.close().catch((err) => {
+          console.error(`Error while closing page for URL ${url}`, err);
+        });
     }
     inProgressUrls.delete(url);
+    browserDict[browserId].currentUrl = null;
     if (!(toReturn === undefined)) {
       return toReturn;
     } else {
@@ -307,11 +323,11 @@ const puppeteerGetInner = async (
     ) {
       console.error(
         `Browser fetching ${url} timed out for ${
-          browserDict[currBrowser.process().pid].numTimeouts + 1
+          browserDict[browserId].numTimeouts + 1
         } time`
       );
-      if (browserDict[currBrowser.process().pid].numTimeouts < 8) {
-        browserDict[currBrowser.process().pid].numTimeouts++;
+      if (browserDict[browserId].numTimeouts < 8) {
+        browserDict[browserId].numTimeouts++;
         return await conclude();
       } else {
         console.error(
@@ -348,7 +364,7 @@ export default puppeteerGet;
     console.error(`num pending: ${getQueue.pending}`);
     console.error(`size: ${getQueue.size}`);
     console.error(`isPaused: ${getQueue.isPaused}`);
-    console.error(`inProgressUrls size: ${inProgressUrls.size}`);
+    console.error(`inProgressUrls: ${Array.from(inProgressUrls.values())}`);
     console.error(`browserDict: ${util.inspect(browserDict)}`);
     console.error(
       `availableHeadfulBrowsers size ${availableHeadfulBrowsers.length}`
