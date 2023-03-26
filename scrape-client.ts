@@ -74,6 +74,9 @@ let inProgressUrls: Set<string> = new Set();
 let emptySlots: number[] = [];
 let allBrowsersCreated = false;
 
+const timeStarted = Date.now();
+let numPagesScraped = 0;
+
 const addNewBrowser = async (headful: boolean) => {
   if (ips.length == 0) {
     console.error("No more IPs available");
@@ -121,11 +124,13 @@ const addNewBrowser = async (headful: boolean) => {
   allBrowsersCreated = true;
 })();
 
-const removeBrowser = async (currBrowser, headful, url) => {
+const removeBrowser = async (currBrowser, headful, url, err) => {
   console.error(
     "Removed browser info:",
     currBrowser.process().pid,
-    browserDict[currBrowser.process().pid]
+    browserDict[currBrowser.process().pid],
+    "Error:",
+    err
   );
   emptySlots.push(browserDict[currBrowser.process().pid].slot);
   try {
@@ -213,10 +218,12 @@ const puppeteerGetInner = async (
         page.close().catch((err) => {
           console.error(`Error while closing page for URL ${url}`, err);
         });
+      browserDict[browserId].currentUrl = null;
     }
     inProgressUrls.delete(url);
-    browserDict[browserId].currentUrl = null;
     if (!(toReturn === undefined)) {
+      // Increment number of pages scraped here because successful scraping will always terminate in this clause
+      numPagesScraped++;
       return toReturn;
     } else {
       return await puppeteerGetInner(url, refererUrl, headful);
@@ -264,13 +271,14 @@ const puppeteerGetInner = async (
       return await conclude(false, null);
     }
     if (
+      responseBody.includes("Access denied") &&
       !responseBody.includes("challenge-running") &&
       !responseBody.includes("© HLTV.org")
     ) {
-      console.error(
-        `Browser fetching url ${url} was blocked, removing it from the pool now.`
-      );
-      await removeBrowser(currBrowser, headful, url);
+      const error = new Error(`Browser fetching url ${url} was blocked`);
+      console.error(`${error.toString()}, removing it from the pool now.`);
+      // await page.screenshot({ path: "cf.png", fullPage: true });
+      await removeBrowser(currBrowser, headful, url, error);
       return await conclude(true);
     }
     // TODO: what happens when I get hcaptcha on everything?
@@ -285,7 +293,8 @@ const puppeteerGetInner = async (
     //   return await retry(true);
     // }
     while (
-      responseBody.includes("challenge-running") &&
+      (responseBody.includes("challenge-running") ||
+        responseBody.includes('<span id="challenge-error-text">')) &&
       tryCount < MAX_CHALLENGE_TRIES
     ) {
       if (!headful) {
@@ -301,7 +310,6 @@ const puppeteerGetInner = async (
       responseUrl = await response.url();
       tryCount++;
       // if (tryCount > 0) console.log(`try number ${tryCount}`);
-      // await page.screenshot({ path: "cf.png", fullPage: true });
     }
     if (responseBody.includes("challenge-running")) {
       console.error(
@@ -333,12 +341,12 @@ const puppeteerGetInner = async (
         console.error(
           `Browser fetching url ${url} timed out too many times, removing it from the pool now.`
         );
-        await removeBrowser(currBrowser, headful, url);
+        await removeBrowser(currBrowser, headful, url, error);
         return await conclude(true);
       }
     } else if (error.toString().includes("ERR_TUNNEL_CONNECTION_FAILED")) {
       console.error(`Proxy connection failed for browser fetching ${url}`);
-      await removeBrowser(currBrowser, headful, url);
+      await removeBrowser(currBrowser, headful, url, error);
       return await conclude(true);
     } else {
       console.error(
@@ -368,6 +376,11 @@ export default puppeteerGet;
     console.error(`browserDict: ${util.inspect(browserDict)}`);
     console.error(
       `availableHeadfulBrowsers size ${availableHeadfulBrowsers.length}`
+    );
+    const timeEnded = Date.now();
+    const minutesScraped = (timeEnded - timeStarted) / 1000 / 60;
+    console.error(
+      `Scraped per minute: ${_.round(numPagesScraped / minutesScraped, 3)}`
     );
   });
 });
