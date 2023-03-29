@@ -146,7 +146,6 @@ const removeBrowser = async (currBrowser, headful, url, err) => {
     console.error("Error while closing browser", e);
   }
   await addNewBrowser(headful);
-  inProgressUrls.delete(url);
   delete browserDict[currBrowser.process().pid];
 };
 
@@ -208,7 +207,8 @@ const puppeteerGetInner = async (
   let page;
   let conclude = async (
     removed: boolean = false,
-    toReturn: any = undefined
+    toReturn: any = undefined,
+    errMessage: string = "No Errors"
   ) => {
     if (!removed) {
       (headful ? availableHeadfulBrowsers : availableHeadlessBrowsers).push(
@@ -267,8 +267,8 @@ const puppeteerGetInner = async (
       responseBody.includes("/img/static/error.png") &&
       responseBody.includes("500")
     ) {
-      console.error(`Server error 500 for url ${url}`);
-      return await conclude(false, null);
+      const error = new Error(`Server error 500 for url ${url}`);
+      return await conclude(false, null, error.message);
     }
     if (
       responseBody.includes("Access denied") &&
@@ -279,7 +279,7 @@ const puppeteerGetInner = async (
       console.error(`${error.toString()}, removing it from the pool now.`);
       // await page.screenshot({ path: "cf.png", fullPage: true });
       await removeBrowser(currBrowser, headful, url, error);
-      return await conclude(true);
+      return await conclude(true, undefined, error.message);
     }
     // TODO: what happens when I get hcaptcha on everything?
     // if (responseBody.includes(`class="hcaptcha-box"`)) {
@@ -312,11 +312,9 @@ const puppeteerGetInner = async (
       // if (tryCount > 0) console.log(`try number ${tryCount}`);
     }
     if (responseBody.includes("challenge-running")) {
-      console.error(
-        `Unable to beat challenge for url ${url}, retrying with new browser`
-      );
+      const error = new Error(`Unable to beat challenge for url ${url}`);
 
-      return await conclude();
+      return await conclude(false, undefined, error.message);
     }
     // if (tryCount > 0) console.log(`Beat challenge after ${tryCount} tries`);
     // responseHeaders = await response.headers();
@@ -336,18 +334,22 @@ const puppeteerGetInner = async (
       );
       if (browserDict[browserId].numTimeouts < 8) {
         browserDict[browserId].numTimeouts++;
-        return await conclude();
+        return await conclude(false, undefined, error.toString());
       } else {
-        console.error(
+        const removalError = new Error(
           `Browser fetching url ${url} timed out too many times, removing it from the pool now.`
         );
         await removeBrowser(currBrowser, headful, url, error);
-        return await conclude(true);
+        return await conclude(
+          true,
+          undefined,
+          removalError.message + error.toString()
+        );
       }
     } else if (error.toString().includes("ERR_TUNNEL_CONNECTION_FAILED")) {
       console.error(`Proxy connection failed for browser fetching ${url}`);
       await removeBrowser(currBrowser, headful, url, error);
-      return await conclude(true);
+      return await conclude(true, undefined, error.toString());
     } else {
       console.error(
         `Browser fetching ${url} encountered unknown error:`,
