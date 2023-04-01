@@ -10,6 +10,7 @@ import events from "events";
 import { delay } from "./scrape-util.js";
 import "log-timestamp";
 import util from "node:util";
+import fetch from "node-fetch";
 
 dotenv.config();
 const NUM_HEADFUL = Number(process.env.NUM_HEADFUL);
@@ -19,6 +20,7 @@ const FORCE_HEADFUL = process.env.FORCE_HEADFUL;
 const FORCE_HEADLESS = process.env.FORCE_HEADLESS;
 const SCRAPE_DELAY = Number(process.env.SCRAPE_DELAY) || 0;
 const WEBSHARE = !!process.env.WEBSHARE;
+const IP_URL = process.env.IP_URL;
 
 const SCREEN_HEIGHT = 1400;
 const SCREEN_WIDTH = 1680;
@@ -30,7 +32,6 @@ const WINDOW_WIDTH = Math.round(SCREEN_WIDTH / MAX_WINDOW_COLS);
 // const WINDOW_HEIGHT = SCREEN_HEIGHT / NUM_WINDOW_ROWS;
 const WINDOW_HEIGHT = Math.round(SCREEN_HEIGHT / NUM_WINDOW_ROWS);
 const WINDOW_SIZE_FLAG = `--window-size=${WINDOW_WIDTH},${WINDOW_HEIGHT}`;
-console.log(WINDOW_SIZE_FLAG);
 
 events.EventEmitter.defaultMaxListeners = BROWSER_LIMIT + 5;
 
@@ -47,14 +48,7 @@ const responseHeadersToRemove = [
 
 const BASE_URL = "https://www.hltv.org";
 
-let ips: string[] = _.shuffle(
-  fs.readFileSync("ips.txt", { encoding: "utf8" }).split("\n")
-);
-if (WEBSHARE)
-  ips = ips.map((ip) => {
-    const splitted = ip.split(":");
-    return `${splitted[2]}:${splitted[3]}@${splitted[0]}:${splitted[1]}`;
-  });
+let ips;
 
 let availableHeadlessBrowsers: Browser[] = [];
 let availableHeadfulBrowsers: Browser[] = [];
@@ -114,6 +108,20 @@ const addNewBrowser = async (headful: boolean) => {
 };
 
 (async () => {
+  console.log(IP_URL);
+  ips = IP_URL
+    ? await (await fetch(IP_URL)).text()
+    : fs.readFileSync("ips.txt", { encoding: "utf8" });
+  ips = ips.split("\n");
+  // Removes the empty last line that these text files often have
+  ips = ips.filter((ip: string) => ip != "");
+  // Ensures that certain IPs don't get used and blocked more than others
+  ips = _.shuffle(ips);
+  if (WEBSHARE)
+    ips = ips.map((ip) => {
+      const splitted = ip.split(":");
+      return `${splitted[2]}:${splitted[3]}@${splitted[0]}:${splitted[1]}`;
+    });
   const browserAdditions: Promise<void>[] = [];
   for (let i = 0; i < BROWSER_LIMIT; i++) {
     emptySlots.push(i);

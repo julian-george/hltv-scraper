@@ -20,6 +20,7 @@
     "lodash": "^4.17.21",
     "mongoose": "^6.7.5",
     "node": "^19.2.0",
+    "node-fetch": "^3.3.1",
     "p-queue": "^7.3.4",
     "proxy-chain": "^2.2.0",
     "puppeteer": "18.1.0",
