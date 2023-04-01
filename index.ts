@@ -1,9 +1,9 @@
-import fs from "fs";
+import fs, { fchmod } from "fs";
 import { load } from "cheerio";
 import mongoose from "mongoose";
 // mongoose.set("debug", true);
 import dotenv from "dotenv";
-import { parseResults } from "./scraper.js";
+import { parseResults, parseMatches } from "./scraper.js";
 import puppeteerGet from "./scrape-client.js";
 
 dotenv.config();
@@ -33,20 +33,37 @@ process.on("SIGINT", () => {
     console.error("Failed to connect to MongoDB", err);
     throw err;
   }
-  const initialResultUrl = !CACHED
-    ? `/results?offset=${RESULT_OFFSET}`
-    : "cached/results-browser.html";
+  const initialRefererUrl = "https://hltv.org";
+  const initialMatchesUrl = `/matches`;
+  const cachedMatchesPath = "cached/matches-browser.html";
+  try {
+    const matchesPage = !CACHED
+      ? await puppeteerGet(initialMatchesUrl, initialRefererUrl, true)
+      : fs.readFileSync(cachedMatchesPath);
+    if (!fs.existsSync(cachedMatchesPath)) {
+      fs.writeFile(cachedMatchesPath, matchesPage, (err) => {
+        if (err) throw err;
+      });
+    }
+    await parseMatches(load(matchesPage), initialMatchesUrl);
+  } catch (err) {
+    console.error("Unable to scrape matches browser");
+  }
+  const initialResultUrl = `/results?offset=${RESULT_OFFSET}`;
+  const cachedResultsPath = "cached/results-browser.html";
   try {
     const resultsPage = !CACHED
-      ? await puppeteerGet(initialResultUrl, "https://hltv.org", true)
-      : fs.readFileSync("cached/results-browser.html");
-    if (!fs.existsSync("cached/results-browser.html")) {
-      fs.writeFile("cached/results-browser.html", resultsPage, (err) => {
+      ? await puppeteerGet(initialResultUrl, initialRefererUrl, true)
+      : fs.readFileSync(cachedResultsPath);
+    if (!fs.existsSync(cachedResultsPath)) {
+      fs.writeFile(cachedResultsPath, resultsPage, (err) => {
         if (err) throw err;
       });
     }
     await parseResults(load(resultsPage), initialResultUrl);
   } catch (err) {
-    console.log("Unable to scrape results browser: ", err);
+    console.error("Unable to scrape results browser: ", err);
   }
+  console.log("Done scraping, ending now.");
+  process.exit(0);
 })();

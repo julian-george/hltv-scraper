@@ -5,6 +5,10 @@ import { createEvent, getEventByHltvId } from "./services/event-service.js";
 import { createPlayer, getPlayerByHltvId } from "./services/player-service.js";
 import { createMap, getMapByHltvId } from "./services/map-service.js";
 import { createMatch, getMatchByHltvId } from "./services/match-service.js";
+import {
+  createUnplayedMatch,
+  getUnplayedMatchByHltvId,
+} from "./services/unplayedmatch-service.js";
 import puppeteerGet from "./scrape-client.js";
 
 dotenv.config();
@@ -23,7 +27,8 @@ const PLAYER_LIMIT = Infinity;
 export const parseMatch = async (
   $: CheerioAPI,
   matchId: number,
-  matchUrl: string
+  matchUrl: string,
+  played: boolean = true
 ) => {
   const componentExecutors: (() => Promise<boolean>)[] = [];
   // const startTime = Date.now();
@@ -51,7 +56,6 @@ export const parseMatch = async (
   try {
     online = format?.includes("Online");
   } catch {}
-
   const eventLink = $("div.event > a")[0];
   let eventId = null;
   if (!eventLink) {
@@ -76,36 +80,62 @@ export const parseMatch = async (
       componentExecutors.push(eventExecutor);
     }
   }
-
-  const playerLinks = $("div#all-content > table.totalstats")
-    .find("td.players > div.flagAlign > a")
-    .toArray()
-    .slice(0, CACHED ? 1 : PLAYER_LIMIT);
-  // const plfayersStartTime = Date.now();
-  for (const playerLink of playerLinks) {
-    const playerUrl = playerLink.attribs["href"];
-    const playerId = Number(playerUrl.split("/")[2]);
-    const playerExecutor = async () => {
-      const player = await getPlayerByHltvId(playerId);
-      if (player) {
-        // console.log(
-        //   "Player ID " + playerId + " already in database, skipping."
-        // );
+  let players = {
+    firstTeam: [],
+    secondTeam: [],
+  };
+  if (played) {
+    const playerLinks = $("div#all-content > table.totalstats")
+      .find("td.players > div.flagAlign > a")
+      .toArray()
+      .slice(0, CACHED ? 1 : PLAYER_LIMIT);
+    // const plfayersStartTime = Date.now();
+    for (const playerLink of playerLinks) {
+      const playerUrl = playerLink.attribs["href"];
+      const playerId = Number(playerUrl.split("/")[2]);
+      const playerExecutor = async () => {
+        const player = await getPlayerByHltvId(playerId);
+        if (player) {
+          // console.log(
+          //   "Player ID " + playerId + " already in database, skipping."
+          // );
+          return true;
+        }
+        const playerPage = !CACHED
+          ? await puppeteerGet(playerUrl, matchUrl)
+          : fs.readFileSync("cached/player-page.html");
+        if (!fs.existsSync("cached/player-page.html")) {
+          fs.writeFile("cached/player-page.html", playerPage, (err) => {
+            if (err) throw err;
+          });
+        }
+        if (playerPage) await parsePlayer(load(playerPage), playerId);
         return true;
-      }
-      const playerPage = !CACHED
-        ? await puppeteerGet(playerUrl, matchUrl)
-        : fs.readFileSync("cached/player-page.html");
-      if (!fs.existsSync("cached/player-page.html")) {
-        fs.writeFile("cached/player-page.html", playerPage, (err) => {
-          if (err) throw err;
-        });
-      }
-      if (playerPage) await parsePlayer(load(playerPage), playerId);
-      return true;
-    };
-    componentExecutors.push(playerExecutor);
+      };
+      componentExecutors.push(playerExecutor);
+    }
+  } else {
+    const teamOnePics = $(
+      `td.player-image > div.player-compare[data-team-ordinal="1"]`
+    );
+    const teamTwoPics = $(
+      `td.player-image > div.player-compare[data-team-ordinal="2"]`
+    );
+
+    if (teamOnePics.length != 5 || teamTwoPics.length != 5) {
+      throw new Error(
+        `Incomplete player list for unplayed match ID ${matchId}`
+      );
+    }
+    for (const picElement of teamOnePics) {
+      players.firstTeam.push(Number(picElement.attribs["data-player-id"]));
+    }
+
+    for (const picElement of teamTwoPics) {
+      players.secondTeam.push(Number(picElement.attribs["data-player-id"]));
+    }
   }
+
   const rankings = {
     firstTeam:
       Number(
@@ -120,128 +150,167 @@ export const parseMatch = async (
           .replace(/[^0-9\.-]+/g, "")
       ) || null,
   };
-  let mapLinks = $(
-    "div.mapholder > div > div.results-center > div.results-center-stats > a"
-  ).toArray();
-  const handleMaps = async (links, referUrl: string): Promise<boolean> => {
-    const mapPromises: Promise<boolean>[] = [];
-    for (const mapLink of links) {
-      mapPromises.push(
-        new Promise(async (resolve, reject) => {
-          const mapUrl = mapLink.attribs["href"];
-          const mapId = Number(mapUrl.split("/")[4]);
-          const map = await getMapByHltvId(mapId);
-          if (map) {
-            console.log("Map ID " + mapId + " already in database, skipping.");
-            resolve(true);
-            return true;
-          }
-          const mapPage = !CACHED
-            ? await puppeteerGet(mapUrl, referUrl)
-            : fs.readFileSync("cached/map-page.html");
-          if (!fs.existsSync("cached/map-page.html")) {
-            fs.writeFile("cached/map-page.html", mapPage, (err) => {
-              if (err) throw err;
-            });
-          }
-          if (mapPage)
-            parseMap(load(mapPage), mapId, matchId, rankings, mapUrl)
-              .catch((err) => {
-                console.error(
-                  "Error while parsing map ID " +
-                    mapId +
-                    ", reason: '" +
-                    err +
-                    "'."
-                );
-              })
-              .finally(() => {
-                resolve(true);
-              });
-          // resolve(true);
-        })
-      );
-    }
-    return Promise.all(mapPromises)
-      .then(() => {
-        return true;
-      })
-      .catch(() => {
-        return false;
-      });
-  };
-  if (mapLinks.length == 0) {
-    // fallback method of getting map stats, since some pages' map stats can only be accessed w/ the "Detailed Stats" button
-    const statsLink = $("div.stats-detailed-stats > a")[0];
-    if (statsLink) {
-      const statsUrl = statsLink.attribs["href"];
-      if (statsUrl.includes("mapstatsid")) {
-        mapLinks = [statsLink];
-      } else {
-        const statsExecutor = async () => {
-          const statsPage = !CACHED
-            ? await puppeteerGet(statsUrl, matchUrl)
-            : fs.readFileSync("cached/stats-page.html");
-          if (!fs.existsSync("cached/stats-page.html")) {
-            fs.writeFile("cached/stats-page.html", statsPage, (err) => {
-              if (err) throw err;
-            });
-          }
-          if (statsPage) {
-            try {
-              const links = await parseMatchStats(load(statsPage));
-              await handleMaps(links, statsUrl);
-            } catch (e) {
-              console.error("Error while parsing stats", e);
+  if (played) {
+    let mapLinks = $(
+      "div.mapholder > div > div.results-center > div.results-center-stats > a"
+    ).toArray();
+    const handleMaps = async (links, referUrl: string): Promise<boolean> => {
+      const mapPromises: Promise<boolean>[] = [];
+      for (const mapLink of links) {
+        mapPromises.push(
+          new Promise(async (resolve, reject) => {
+            const mapUrl = mapLink.attribs["href"];
+            const mapId = Number(mapUrl.split("/")[4]);
+            const map = await getMapByHltvId(mapId);
+            if (map) {
+              console.log(
+                "Map ID " + mapId + " already in database, skipping."
+              );
+              resolve(true);
+              return true;
             }
-          }
+            const mapPage = !CACHED
+              ? await puppeteerGet(mapUrl, referUrl)
+              : fs.readFileSync("cached/map-page.html");
+            if (!fs.existsSync("cached/map-page.html")) {
+              fs.writeFile("cached/map-page.html", mapPage, (err) => {
+                if (err) throw err;
+              });
+            }
+            if (mapPage)
+              parseMap(load(mapPage), mapId, matchId, rankings, mapUrl)
+                .catch((err) => {
+                  console.error(
+                    "Error while parsing map ID " +
+                      mapId +
+                      ", reason: '" +
+                      err +
+                      "'."
+                  );
+                })
+                .finally(() => {
+                  resolve(true);
+                });
+            // resolve(true);
+          })
+        );
+      }
+      return Promise.all(mapPromises)
+        .then(() => {
           return true;
-        };
-        componentExecutors.push(statsExecutor);
+        })
+        .catch(() => {
+          return false;
+        });
+    };
+    if (mapLinks.length == 0) {
+      // fallback method of getting map stats, since some pages' map stats can only be accessed w/ the "Detailed Stats" button
+      const statsLink = $("div.stats-detailed-stats > a")[0];
+      if (statsLink) {
+        const statsUrl = statsLink.attribs["href"];
+        if (statsUrl.includes("mapstatsid")) {
+          mapLinks = [statsLink];
+        } else {
+          const statsExecutor = async () => {
+            const statsPage = !CACHED
+              ? await puppeteerGet(statsUrl, matchUrl)
+              : fs.readFileSync("cached/stats-page.html");
+            if (!fs.existsSync("cached/stats-page.html")) {
+              fs.writeFile("cached/stats-page.html", statsPage, (err) => {
+                if (err) throw err;
+              });
+            }
+            if (statsPage) {
+              try {
+                const links = await parseResultStats(load(statsPage));
+                await handleMaps(links, statsUrl);
+              } catch (e) {
+                console.error("Error while parsing stats", e);
+              }
+            }
+            return true;
+          };
+          componentExecutors.push(statsExecutor);
+        }
+      } else {
+        console.error(`No maps available for match`, matchId);
       }
     } else {
-      console.error(`No maps available for match`, matchId);
+      const handleMapExecutor = async () => {
+        return await handleMaps(mapLinks, matchUrl);
+      };
+      componentExecutors.push(handleMapExecutor);
     }
-  } else {
-    const handleMapExecutor = async () => {
-      return await handleMaps(mapLinks, matchUrl);
-    };
-    componentExecutors.push(handleMapExecutor);
   }
   const componentPromises = componentExecutors.map((executor) => executor());
   await Promise.all(componentPromises);
-  if (CACHED) {
-    console.log("New match", {
-      hltvId,
-      title,
-      eventId,
-      date,
-      format,
-      online,
-      matchType,
-    });
-    return;
-  }
-  if (TRAVERSE_ADDED_MATCHES) {
-    const foundMatch = await getMatchByHltvId(hltvId);
-    if (foundMatch) return foundMatch;
-  }
-  try {
-    return await createMatch({
-      hltvId,
-      title,
-      eventId,
-      date,
-      format,
-      online,
-      matchType,
-    });
-  } catch (err) {
-    throw new Error(`Unable to add match ID ${hltvId} to the database:`, err);
+  if (played) {
+    if (CACHED) {
+      console.log("New match", {
+        hltvId,
+        title,
+        eventId,
+        date,
+        format,
+        online,
+        matchType,
+      });
+      return;
+    }
+    if (TRAVERSE_ADDED_MATCHES) {
+      const foundMatch = await getMatchByHltvId(hltvId);
+      if (foundMatch) return foundMatch;
+    }
+    try {
+      return await createMatch({
+        hltvId,
+        title,
+        eventId,
+        date,
+        format,
+        online,
+        matchType,
+      });
+    } catch (err) {
+      throw new Error(`Unable to add match ID ${hltvId} to the database:`, err);
+    }
+  } else {
+    if (CACHED) {
+      console.log("New unplayed match", {
+        hltvId,
+        title,
+        eventId,
+        date,
+        format,
+        online,
+        matchType,
+        rankings,
+        players,
+      });
+      return;
+    }
+    try {
+      return await createUnplayedMatch({
+        hltvId,
+        title,
+        eventId,
+        date,
+        format,
+        online,
+        matchType,
+        rankings,
+        players,
+      });
+    } catch (err) {
+      throw new Error(
+        `Unable to add unplayed match ID ${hltvId} to the database:`,
+        err
+      );
+    }
   }
 };
 
-const parseMatchStats = async ($: CheerioAPI) => {
+const parseResultStats = async ($: CheerioAPI) => {
   return $(".columns > .stats-match-map.inactive").toArray();
 };
 
@@ -603,6 +672,7 @@ const parsePlayer = async ($: CheerioAPI, playerId: number) => {
 };
 
 export const parseResults = async ($: CheerioAPI, resultsUrl: string) => {
+  let finished = false;
   const resultLinks = $("div.allres")
     .find("div.result-con > a")
     .toArray()
@@ -615,7 +685,7 @@ export const parseResults = async ($: CheerioAPI, resultsUrl: string) => {
     if (match && !TRAVERSE_ADDED_MATCHES) {
       if (ABORT_UPON_DUPLICATE) {
         console.log("Match ID " + matchId + " already in database, aborting.");
-        return;
+        finished = true;
       }
       console.log("Match ID " + matchId + " already in database, skipping.");
       continue;
@@ -645,8 +715,9 @@ export const parseResults = async ($: CheerioAPI, resultsUrl: string) => {
   }
   if (!CACHED) {
     const nextUrl = $("a.pagination-next").attr("href");
-    if (!nextUrl) {
-      console.log("You reached the end!");
+    if (!nextUrl) finished = true;
+    if (finished) {
+      console.log("Finishing now.");
     } else {
       puppeteerGet(nextUrl, resultsUrl, true).then((nextResultsPage) => {
         if (!nextResultsPage)
@@ -669,4 +740,68 @@ export const parseResults = async ($: CheerioAPI, resultsUrl: string) => {
   console.log(
     `Page of results url ${resultsUrl} took ${resultElapsed} seconds!`
   );
+};
+
+/* MATCH SCRAPING */
+
+// This determines how many days in the future (including today) that matches will be pulled from. undefined for no limit
+const DAYS_TO_SCRAPE = 3;
+const ALWAYS_OVERWRITE_MATCHES = true;
+
+export const parseMatches = async ($: CheerioAPI, matchesUrl: string) => {
+  const matchExecutors: (() => Promise<boolean>)[] = [];
+  const matchSections = $("div.upcomingMatchesSection").slice(
+    0,
+    DAYS_TO_SCRAPE
+  );
+  for (const section of matchSections) {
+    const matchLinks = $(section).find("div.upcomingMatch > a.match");
+    for (const matchLink of matchLinks) {
+      const matchUrl = matchLink.attribs["href"];
+      const matchId = Number(matchUrl.split("/")[2]);
+      if (!ALWAYS_OVERWRITE_MATCHES) {
+        const match = await getUnplayedMatchByHltvId(matchId);
+        if (match) {
+          console.log(
+            "Unplayed match ID " + matchId + " already in database, skipping."
+          );
+          continue;
+        }
+      }
+      const matchExecutor = async () => {
+        const matchPage = !CACHED
+          ? await puppeteerGet(matchUrl, matchesUrl)
+          : fs.readFileSync("cached/match-page.html");
+        if (!fs.existsSync("cached/match-page.html")) {
+          fs.writeFile("cached/match-page.html", matchPage, (err) => {
+            if (err) throw err;
+          });
+        }
+        if (matchPage)
+          await parseMatch(load(matchPage), matchId, matchUrl, false).catch(
+            (err) => {
+              console.error(
+                "Error while parsing match ID " +
+                  matchId +
+                  ", reason: '" +
+                  err +
+                  "'."
+              );
+            }
+          );
+        return true;
+      };
+      matchExecutors.push(matchExecutor);
+    }
+  }
+  const matchStart = Date.now();
+  // For debug: if you ever want to test matches sequentially
+  // for (const executor of resultExecutors) {
+  //   await executor();
+  // }
+  const matchPromises = matchExecutors.map((executor) => executor());
+  await Promise.all(matchPromises);
+  const matchEnd = Date.now();
+  const matchElapsed = Math.round((matchEnd - matchStart) / 10) / 100;
+  console.log(`New matches took ${matchElapsed} seconds!`);
 };
