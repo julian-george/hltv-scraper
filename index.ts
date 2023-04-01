@@ -1,16 +1,17 @@
 import fs, { fchmod } from "fs";
 import { load } from "cheerio";
 import mongoose from "mongoose";
+import config from "config";
 // mongoose.set("debug", true);
 import dotenv from "dotenv";
-import { parseResults, parseMatches } from "./scraper.js";
+import { scrapeResults, scrapeMatches } from "./scraper.js";
 import puppeteerGet from "./scrape-client.js";
 
 dotenv.config();
 
 const MONGODB_URI = process.env.MONGODB_URI;
-const RESULT_OFFSET = process.env.RESULT_OFFSET || 0;
-const CACHED = !!process.env.SCRAPE_CACHED;
+const CACHED = config.get("scrapeCached");
+const RESULT_OFFSET = config.get("results.offset");
 
 let connection;
 
@@ -45,7 +46,7 @@ process.on("SIGINT", () => {
         if (err) throw err;
       });
     }
-    await parseMatches(load(matchesPage), initialMatchesUrl);
+    await scrapeMatches(load(matchesPage), initialMatchesUrl);
   } catch (err) {
     console.error("Unable to scrape matches browser");
   }
@@ -60,7 +61,7 @@ process.on("SIGINT", () => {
         if (err) throw err;
       });
     }
-    await parseResults(load(resultsPage), initialResultUrl);
+    await scrapeResults(load(resultsPage), initialResultUrl);
   } catch (err) {
     console.error("Unable to scrape results browser: ", err);
   }

@@ -1,6 +1,7 @@
 import { Query } from "mongoose";
 import PQueue from "p-queue";
 import dotenv from "dotenv";
+import config from "config";
 
 dotenv.config();
 
@@ -10,7 +11,7 @@ const MIN_QUERY_WAIT = 200;
 const MIN_EXTENDED_QUERY_WAIT = 20000;
 const MAX_EXTENDED_QUERY_WAIT = 40000;
 const RETRY_NUM = 5;
-const BROWSER_LIMIT = Number(process.env.BROWSER_LIMIT) || 1;
+const BROWSER_LIMIT = config.get("browsers.limit");
 const MAX_CONCURRENT_QUERIES = BROWSER_LIMIT;
 
 const queryQueue = new PQueue({

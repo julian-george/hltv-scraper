@@ -1,0 +1,22 @@
+{
+  "scrapeCached": false,
+  "results": {
+    "offset": 0,
+    "finishUponDuplicate": true,
+    "traverseAdded": false
+  },
+  "unplayedMatches": {
+    "daysToScrape": 3,
+    "overwrite": true
+  },
+  "browsers": {
+    "limit": 12,
+    "numHeadful": 12,
+    "maxChallengeAttempts": 12,
+    "forceHeadful": true,
+    "forceHeadless": false,
+    "scrapeDelay": 750,
+    "webshareFormat": true,
+    "ipUrl": "https://proxy.webshare.io/api/v2/proxy/list/download/cyxykwloqjioumllmdvstnglaxdlvezeyqnwswcr/-/any/username/direct/-/"
+  }
+}

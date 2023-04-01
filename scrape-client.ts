@@ -11,16 +11,17 @@ import { delay } from "./scrape-util.js";
 import "log-timestamp";
 import util from "node:util";
 import fetch from "node-fetch";
+import config from "config";
 
 dotenv.config();
-const NUM_HEADFUL = Number(process.env.NUM_HEADFUL);
-const MAX_CHALLENGE_TRIES = Number(process.env.MAX_CHALLENGE_TRIES);
-const BROWSER_LIMIT = Number(process.env.BROWSER_LIMIT) || 1;
-const FORCE_HEADFUL = process.env.FORCE_HEADFUL;
-const FORCE_HEADLESS = process.env.FORCE_HEADLESS;
-const SCRAPE_DELAY = Number(process.env.SCRAPE_DELAY) || 0;
-const WEBSHARE = !!process.env.WEBSHARE;
-const IP_URL = process.env.IP_URL;
+const NUM_HEADFUL = config.get("browsers.numHeadful");
+const MAX_CHALLENGE_TRIES = config.get("browsers.maxChallengeAttempts");
+const BROWSER_LIMIT = config.get("browsers.limit");
+const FORCE_HEADFUL = config.get("browsers.forceHeadful");
+const FORCE_HEADLESS = config.get("browsers.forceHeadless");
+const SCRAPE_DELAY = config.get("browsers.scrapeDelay");
+const WEBSHARE = config.get("browsers.webshareFormat");
+const IP_URL = config.get("browsers.ipUrl");
 
 const SCREEN_HEIGHT = 1400;
 const SCREEN_WIDTH = 1680;
