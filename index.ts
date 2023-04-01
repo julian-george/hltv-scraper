@@ -1,4 +1,4 @@
-import fs, { fchmod } from "fs";
+import fs from "fs";
 import { load } from "cheerio";
 import mongoose from "mongoose";
 import config from "config";
