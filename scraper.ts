@@ -499,7 +499,8 @@ const parseEvent = async ($: CheerioAPI, eventId: number) => {
       ".eventMeta > tbody > tr > th:contains('Prize pool')"
     )
       .next("td")[0]
-      .attribs["title"].toLocaleLowerCase();
+      .attribs["title"].toLocaleLowerCase()
+      .split(" ")[0];
     if (!prizePoolString.includes("spots")) {
       prizePool = Number(prizePoolString.replace(/[^0-9\.-]+/g, "")) || null;
     }
@@ -646,14 +647,15 @@ export const parseResults = async ($: CheerioAPI, resultsUrl: string) => {
     const nextUrl = $("a.pagination-next").attr("href");
     if (!nextUrl) {
       console.log("You reached the end!");
-      return;
+    } else {
+      puppeteerGet(nextUrl, resultsUrl, true).then((nextResultsPage) => {
+        if (!nextResultsPage)
+          console.error("Unable to find next results page.");
+        else {
+          parseResults(load(nextResultsPage), nextUrl);
+        }
+      });
     }
-    puppeteerGet(nextUrl, resultsUrl, true).then((nextResultsPage) => {
-      if (!nextResultsPage) console.error("Unable to find next results page.");
-      else {
-        parseResults(load(nextResultsPage), nextUrl);
-      }
-    });
   }
   const resultStart = Date.now();
   // For debug: if you ever want to test matches sequentially

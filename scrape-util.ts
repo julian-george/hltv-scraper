@@ -8,7 +8,7 @@ const MAX_QUERY_TIME = 10000;
 const MAX_QUERY_WAIT = 1500;
 const MIN_QUERY_WAIT = 200;
 const MIN_EXTENDED_QUERY_WAIT = 20000;
-const MAX_EXTENDED_QUERY_WAIT = 30000;
+const MAX_EXTENDED_QUERY_WAIT = 40000;
 const RETRY_NUM = 5;
 const BROWSER_LIMIT = Number(process.env.BROWSER_LIMIT) || 1;
 const MAX_CONCURRENT_QUERIES = BROWSER_LIMIT;
@@ -50,7 +50,7 @@ export const queryWrapper = async (query: () => Query<any, any, any, any>) => {
       ) {
         console.error(`Query timeout on try ${i}:`, err);
         // Short variable delay to prevent clumping of queries at static intervals
-        if (i <= RETRY_NUM - 1)
+        if (i < RETRY_NUM - 1)
           await delay(MIN_QUERY_WAIT, MAX_QUERY_WAIT - MIN_QUERY_WAIT);
         else
           await delay(
@@ -81,7 +81,7 @@ export const insertWrapper = async (insert: () => Promise<any>) => {
         return true;
       } else if (err.includes("timed out")) {
         console.error(`Insert timeout on try ${i}:`, err);
-        if (i <= RETRY_NUM - 1)
+        if (i < RETRY_NUM - 1)
           await delay(MIN_QUERY_WAIT, MAX_QUERY_WAIT - MIN_QUERY_WAIT);
         else
           await delay(

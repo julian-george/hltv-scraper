@@ -207,9 +207,11 @@ const puppeteerGetInner = async (
   let page;
   let conclude = async (
     removed: boolean = false,
-    toReturn: any = undefined,
-    errMessage: string = "No Errors"
+    toReturn: any = undefined
   ) => {
+    // console.log(
+    //   `conclude ${url}: removed:${removed} toReturn:${toReturn === undefined}`
+    // );
     if (!removed) {
       (headful ? availableHeadfulBrowsers : availableHeadlessBrowsers).push(
         currBrowser
@@ -268,7 +270,7 @@ const puppeteerGetInner = async (
       responseBody.includes("500")
     ) {
       const error = new Error(`Server error 500 for url ${url}`);
-      return await conclude(false, null, error.message);
+      return await conclude(false, null);
     }
     if (
       responseBody.includes("Access denied") &&
@@ -279,7 +281,7 @@ const puppeteerGetInner = async (
       console.error(`${error.toString()}, removing it from the pool now.`);
       // await page.screenshot({ path: "cf.png", fullPage: true });
       await removeBrowser(currBrowser, headful, url, error);
-      return await conclude(true, undefined, error.message);
+      return await conclude(true, undefined);
     }
     // TODO: what happens when I get hcaptcha on everything?
     // if (responseBody.includes(`class="hcaptcha-box"`)) {
@@ -314,7 +316,7 @@ const puppeteerGetInner = async (
     if (responseBody.includes("challenge-running")) {
       const error = new Error(`Unable to beat challenge for url ${url}`);
 
-      return await conclude(false, undefined, error.message);
+      return await conclude(false, undefined);
     }
     // if (tryCount > 0) console.log(`Beat challenge after ${tryCount} tries`);
     // responseHeaders = await response.headers();
@@ -334,22 +336,18 @@ const puppeteerGetInner = async (
       );
       if (browserDict[browserId].numTimeouts < 8) {
         browserDict[browserId].numTimeouts++;
-        return await conclude(false, undefined, error.toString());
+        return await conclude(false, undefined);
       } else {
         const removalError = new Error(
           `Browser fetching url ${url} timed out too many times, removing it from the pool now.`
         );
         await removeBrowser(currBrowser, headful, url, error);
-        return await conclude(
-          true,
-          undefined,
-          removalError.message + error.toString()
-        );
+        return await conclude(true, undefined);
       }
     } else if (error.toString().includes("ERR_TUNNEL_CONNECTION_FAILED")) {
       console.error(`Proxy connection failed for browser fetching ${url}`);
       await removeBrowser(currBrowser, headful, url, error);
-      return await conclude(true, undefined, error.toString());
+      return await conclude(true, undefined);
     } else {
       console.error(
         `Browser fetching ${url} encountered unknown error:`,
