@@ -3,15 +3,15 @@ import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import dotenv from "dotenv";
 import { Browser } from "puppeteer";
-import PQueue from "p-queue";
 import { anonymizeProxy } from "proxy-chain";
 import _ from "lodash";
 import events from "events";
-import { delay } from "./scrape-util.js";
 import "log-timestamp";
 import util from "node:util";
 import fetch from "node-fetch";
 import config from "config";
+import { delay } from "./scrape-util.js";
+import { getQueue } from "./queues.js";
 
 dotenv.config();
 const NUM_HEADFUL = config.get("browsers.numHeadful");
@@ -157,10 +157,6 @@ const removeBrowser = async (currBrowser, headful, url, err) => {
   await addNewBrowser(headful);
   delete browserDict[currBrowser.process().pid];
 };
-
-const getQueue = new PQueue({
-  concurrency: BROWSER_LIMIT,
-});
 
 getQueue.on("add", () => {
   const queueSize = getQueue.size;

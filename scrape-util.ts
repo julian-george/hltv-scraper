@@ -1,7 +1,6 @@
 import { Query } from "mongoose";
-import PQueue from "p-queue";
 import dotenv from "dotenv";
-import config from "config";
+import { queryQueue } from "./queues.js";
 
 dotenv.config();
 
@@ -11,12 +10,6 @@ const MIN_QUERY_WAIT = 200;
 const MIN_EXTENDED_QUERY_WAIT = 20000;
 const MAX_EXTENDED_QUERY_WAIT = 40000;
 const RETRY_NUM = 5;
-const BROWSER_LIMIT = config.get("browsers.limit");
-const MAX_CONCURRENT_QUERIES = BROWSER_LIMIT;
-
-const queryQueue = new PQueue({
-  concurrency: MAX_CONCURRENT_QUERIES,
-});
 
 queryQueue.on("add", () => {
   const queueSize = queryQueue.size;
@@ -27,11 +20,11 @@ queryQueue.on("add", () => {
     console.error("num queries pending:", numPending - 1);
 });
 
-export const delay = (ms: number, maxDelay: number = 1500) =>
+export const delay = (delayOffset: number, maxDelay: number = 1500) =>
   new Promise((resolve) => {
     setTimeout(() => {
       resolve(true);
-    }, Math.random() * maxDelay + ms);
+    }, Math.random() * maxDelay + delayOffset);
   });
 
 export const queryWrapper = async (query: () => Query<any, any, any, any>) => {

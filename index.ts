@@ -65,6 +65,4 @@ process.on("SIGINT", () => {
   } catch (err) {
     console.error("Unable to scrape results browser: ", err);
   }
-  console.log("Done scraping, ending now.");
-  process.exit(0);
 })();

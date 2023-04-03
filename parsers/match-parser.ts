@@ -5,7 +5,10 @@ import { getEventByHltvId } from "../services/event-service.js";
 import { getPlayerByHltvId } from "../services/player-service.js";
 import { getMapByHltvId } from "../services/map-service.js";
 import { createMatch, getMatchByHltvId } from "../services/match-service.js";
-import { createUnplayedMatch } from "../services/unplayedmatch-service.js";
+import {
+  createUnplayedMatch,
+  deleteUnplayedMatchByHltvId,
+} from "../services/unplayedmatch-service.js";
 import puppeteerGet from "../scrape-client.js";
 import parseEvent from "./event-parser.js";
 import parsePlayer from "./player-parser.js";
@@ -254,6 +257,7 @@ export const parseMatch = async (
       const foundMatch = await getMatchByHltvId(hltvId);
       if (foundMatch) return foundMatch;
     }
+    await deleteUnplayedMatchByHltvId(hltvId);
     try {
       return await createMatch({
         hltvId,
