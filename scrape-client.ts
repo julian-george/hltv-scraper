@@ -158,11 +158,11 @@ const removeBrowser = async (currBrowser, headful, url, err) => {
   delete browserDict[currBrowser.process().pid];
 };
 
-getQueue.on("add", () => {
-  const queueSize = getQueue.size;
-  if ((queueSize + 1) % 100 == 0)
-    console.error("getQueue size:", queueSize - 1);
-});
+// getQueue.on("add", () => {
+//   const queueSize = getQueue.size;
+//   if ((queueSize + 1) % 100 == 0)
+//     console.error("getQueue size:", queueSize - 1);
+// });
 
 // much of this function comes from the npm package "pupflare"
 const puppeteerGetInner = async (

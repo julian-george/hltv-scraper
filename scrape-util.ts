@@ -11,14 +11,14 @@ const MIN_EXTENDED_QUERY_WAIT = 20000;
 const MAX_EXTENDED_QUERY_WAIT = 40000;
 const RETRY_NUM = 5;
 
-queryQueue.on("add", () => {
-  const queueSize = queryQueue.size;
-  if ((queueSize + 1) % 100 == 0)
-    console.error("queryQueue size:", queueSize - 1);
-  const numPending = queryQueue.pending;
-  if ((numPending + 1) % 25 == 0)
-    console.error("num queries pending:", numPending - 1);
-});
+// queryQueue.on("add", () => {
+//   const queueSize = queryQueue.size;
+//   if ((queueSize + 1) % 100 == 0)
+//     console.error("queryQueue size:", queueSize - 1);
+//   const numPending = queryQueue.pending;
+//   if ((numPending + 1) % 25 == 0)
+//     console.error("num queries pending:", numPending - 1);
+// });
 
 export const delay = (delayOffset: number, maxDelay: number = 1500) =>
   new Promise((resolve) => {

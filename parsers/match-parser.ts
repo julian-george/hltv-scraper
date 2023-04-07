@@ -10,6 +10,8 @@ import {
   deleteUnplayedMatchByHltvId,
 } from "../services/unplayedmatch-service.js";
 import puppeteerGet from "../scrape-client.js";
+import formatProcessor from "../processors/match-format.js";
+import matchTypeProcessor from "../processors/match-matchtype.js";
 import parseEvent from "./event-parser.js";
 import parsePlayer from "./player-parser.js";
 import parseMap from "./map-parser.js";
@@ -40,14 +42,24 @@ export const parseMatch = async (
   try {
     date = new Date(Number($(".timeAndEvent > .time")[0].attribs["data-unix"]));
   } catch {}
+  let numMaps = null;
+  try {
+    numMaps = $("div.mapholder").length;
+  } catch {}
   let format = null;
   try {
     format = $($("div.preformatted-text")[0]).text().split("\n")[0];
   } catch {}
+  const formatCategory = formatProcessor(format);
   let matchType = null;
   try {
-    matchType = $($("div.preformatted-text")[0]).text().split("* ")[1];
+    matchType = $($("div.preformatted-text")[0])
+      .text()
+      .split("* ")[1]
+      .split(".")[0]
+      .split("\n")[0];
   } catch {}
+  const matchTypeCategory = matchTypeProcessor(matchType);
   let online = null;
   try {
     online = format?.includes("Online");
@@ -267,6 +279,7 @@ export const parseMatch = async (
         format,
         online,
         matchType,
+        numMaps,
       });
     } catch (err) {
       throw new Error(`Unable to add match ID ${hltvId} to the database:`, err);

@@ -11,6 +11,7 @@ export const matchSchema = new Schema({
   title: String,
   date: Date,
   format: String,
+  numMaps: Number,
   online: Boolean,
   // i.e. grand final, quarterfinal, swiss stage, etc
   matchType: String,
