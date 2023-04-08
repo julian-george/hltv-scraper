@@ -11,6 +11,7 @@ const parseMap = async (
   mapId: number,
   matchId: number,
   rankings: { firstTeam: number | null; secondTeam: number | null },
+  date: Date,
   mapUrl: string
 ) => {
   const hltvId = mapId;
@@ -133,20 +134,10 @@ const parseMap = async (
           secondTeamStats[playerId][statAttr] = statObj;
         }
       }
-      teamOneStats = [];
-      teamTwoStats = [];
-      for (const hltvId of Object.keys(firstTeamStats)) {
-        (firstWon ? teamOneStats : teamTwoStats).push({
-          ...firstTeamStats[hltvId],
-          hltvId,
-        });
-      }
-      for (const hltvId of Object.keys(secondTeamStats)) {
-        (firstWon ? teamTwoStats : teamOneStats).push({
-          ...secondTeamStats[hltvId],
-          hltvId,
-        });
-      }
+      teamOneStats = {};
+      teamTwoStats = {};
+      firstWon ? teamOneStats : teamTwoStats = firstTeamStats;
+      firstWon ? teamTwoStats : teamOneStats = secondTeamStats;
     }
   }
   if (!CACHED)

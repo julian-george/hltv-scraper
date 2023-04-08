@@ -186,7 +186,7 @@ export const parseMatch = async (
               });
             }
             if (mapPage)
-              parseMap(load(mapPage), mapId, matchId, rankings, mapUrl)
+              parseMap(load(mapPage), mapId, matchId, rankings, date, mapUrl)
                 .catch((err) => {
                   console.error(
                     "Error while parsing map ID " +
@@ -280,6 +280,8 @@ export const parseMatch = async (
         online,
         matchType,
         numMaps,
+        matchTypeCategory,
+        formatCategory,
       });
     } catch (err) {
       throw new Error(`Unable to add match ID ${hltvId} to the database:`, err);

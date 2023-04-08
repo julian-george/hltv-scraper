@@ -19,16 +19,13 @@ export const playerHalfStatsSchema = new Schema({
   assists: Number,
   flashAssists: Number,
   deaths: Number,
-  kast: SchemaTypes.Decimal128,
-  adr: SchemaTypes.Decimal128,
+  kast: Number,
+  adr: Number,
   fkDiff: Number,
-  rating: SchemaTypes.Decimal128,
+  rating: Number,
 });
 
 export const playerStatsSchema = new Schema({
-  hltvId: {
-    type: Number,
-  },
   // formatted {hltvId: #kills against them}
   duelMap: {
     all: {
@@ -61,8 +58,9 @@ export const mapSchema = new Schema({
   // If not a tie, teamOne is the winner, teamTwo is the loser
   teamOneRanking: Number,
   teamTwoRanking: Number,
-  teamOneStats: [playerStatsSchema],
-  teamTwoStats: [playerStatsSchema],
+  teamOneStats: { type: SchemaTypes.Map, of: playerStatsSchema },
+  teamTwoStats: { type: SchemaTypes.Map, of: playerStatsSchema },
+  date: Date,
 });
 
 const Map = model("Map", mapSchema);

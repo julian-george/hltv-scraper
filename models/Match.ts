@@ -15,6 +15,8 @@ export const matchSchema = new Schema({
   online: Boolean,
   // i.e. grand final, quarterfinal, swiss stage, etc
   matchType: String,
+  formatCategory: Number,
+  matchTypeCategory: Number,
 });
 
 const Match = model("Match", matchSchema);

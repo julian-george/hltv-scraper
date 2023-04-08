@@ -38,6 +38,9 @@ const parseEvent = async ($: CheerioAPI, eventId: number) => {
           .next("td")[0]
           .attribs["title"].replace(/[^0-9\.-]+/g, "")
       ) || null;
+    if (!teamNum) {
+      teamNum = $("div.teams-attending > div.team-box").length;
+    }
   } catch {}
   let prizePool = null;
   try {

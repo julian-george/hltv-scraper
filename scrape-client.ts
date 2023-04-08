@@ -109,7 +109,6 @@ const addNewBrowser = async (headful: boolean) => {
 };
 
 (async () => {
-  console.log(IP_URL);
   ips = IP_URL
     ? await (await fetch(IP_URL)).text()
     : fs.readFileSync("ips.txt", { encoding: "utf8" });

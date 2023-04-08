@@ -12,6 +12,7 @@ dotenv.config();
 const MONGODB_URI = process.env.MONGODB_URI;
 const CACHED = config.get("scrapeCached");
 const RESULT_OFFSET = config.get("results.offset");
+const ONLY_SCRAPE_PLAYED = config.get("onlyScrapePlayed");
 
 let connection;
 
@@ -35,20 +36,22 @@ process.on("SIGINT", () => {
     throw err;
   }
   const initialRefererUrl = "https://hltv.org";
-  const initialMatchesUrl = `/matches`;
-  const cachedMatchesPath = "cached/matches-browser.html";
-  try {
-    const matchesPage = !CACHED
-      ? await puppeteerGet(initialMatchesUrl, initialRefererUrl, true)
-      : fs.readFileSync(cachedMatchesPath);
-    if (!fs.existsSync(cachedMatchesPath)) {
-      fs.writeFile(cachedMatchesPath, matchesPage, (err) => {
-        if (err) throw err;
-      });
+  if (!ONLY_SCRAPE_PLAYED) {
+    const initialMatchesUrl = `/matches`;
+    const cachedMatchesPath = "cached/matches-browser.html";
+    try {
+      const matchesPage = !CACHED
+        ? await puppeteerGet(initialMatchesUrl, initialRefererUrl, true)
+        : fs.readFileSync(cachedMatchesPath);
+      if (!fs.existsSync(cachedMatchesPath)) {
+        fs.writeFile(cachedMatchesPath, matchesPage, (err) => {
+          if (err) throw err;
+        });
+      }
+      await scrapeMatches(load(matchesPage), initialMatchesUrl);
+    } catch (err) {
+      console.error("Unable to scrape matches browser");
     }
-    await scrapeMatches(load(matchesPage), initialMatchesUrl);
-  } catch (err) {
-    console.error("Unable to scrape matches browser");
   }
   const initialResultUrl = `/results?offset=${RESULT_OFFSET}`;
   const cachedResultsPath = "cached/results-browser.html";
