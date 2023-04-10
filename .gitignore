@@ -8,3 +8,4 @@ error-log.txt
 log.txt
 matrix.npy
 processed-maps.json
+__pycache__

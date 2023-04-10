@@ -236,11 +236,11 @@ def get_detailed_stats(player_id, date):
     return t_stats_analyzed + ct_stats_analyzed
 
 
-def process_maps(maps, matrix_lock, history_lock, matrix, map_history):
+def process_maps(maps, matrix_lock, history_lock, feature_data):
     for curr_map in maps:
         print("Processing map ID:", curr_map["hltvId"])
         with matrix_lock:
-            if curr_map["hltvId"] in map_history:
+            if curr_map["hltvId"] in feature_data.history:
                 continue
         w = []
         related_match = matches.find_one({"hltvId": curr_map["matchId"]})
@@ -348,6 +348,8 @@ def process_maps(maps, matrix_lock, history_lock, matrix, map_history):
         w += detailed_stats
 
         with history_lock:
-            map_history.add(curr_map["hltvId"])
+            feature_data.history.add(curr_map["hltvId"])
         with matrix_lock:
-            matrix = np.append(matrix, np.array([w]).T, axis=1)
+            feature_data.matrix = np.append(
+                feature_data.matrix, np.array([w]).T, axis=1
+            )
