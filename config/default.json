@@ -11,8 +11,8 @@
     "overwrite": false
   },
   "browsers": {
-    "limit": 24,
-    "numHeadful": 24,
+    "limit": 28,
+    "numHeadful": 28,
     "maxChallengeAttempts": 12,
     "forceHeadful": true,
     "forceHeadless": false,
