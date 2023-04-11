@@ -47,6 +47,7 @@ const parseMap = async (
   let teamTwoRanking = null;
   let teamOneStats = null;
   let teamTwoStats = null;
+  let players = null;
   const firstWon =
     Number($(scoreContainer.childNodes[0]).text()) >=
     Number($(scoreContainer.childNodes[2]).text());
@@ -89,6 +90,9 @@ const parseMap = async (
       ({ firstTeamStats, secondTeamStats } = await parseMapPerformance(
         load(mapPerformancePage)
       ));
+      players = Object.keys(firstTeamStats).concat(
+        Object.keys(secondTeamStats)
+      );
       const tStatRows = $("table.tstats > tbody > tr").toArray();
       const ctStatRows = $("table.ctstats > tbody > tr").toArray();
       const allRows = [...tStatRows, ...ctStatRows];
@@ -136,8 +140,8 @@ const parseMap = async (
       }
       teamOneStats = {};
       teamTwoStats = {};
-      firstWon ? teamOneStats : teamTwoStats = firstTeamStats;
-      firstWon ? teamTwoStats : teamOneStats = secondTeamStats;
+      firstWon ? teamOneStats : (teamTwoStats = firstTeamStats);
+      firstWon ? teamTwoStats : (teamOneStats = secondTeamStats);
     }
   }
   if (!CACHED)
@@ -151,6 +155,7 @@ const parseMap = async (
         teamTwoRanking,
         teamOneStats,
         teamTwoStats,
+        players,
       });
     } catch (err) {
       throw new Error("Unable to add map ID " + hltvId + " to database: ", err);

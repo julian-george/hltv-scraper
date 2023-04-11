@@ -61,6 +61,7 @@ export const mapSchema = new Schema({
   teamOneStats: { type: SchemaTypes.Map, of: playerStatsSchema },
   teamTwoStats: { type: SchemaTypes.Map, of: playerStatsSchema },
   date: Date,
+  players: [Number],
 });
 
 const Map = model("Map", mapSchema);

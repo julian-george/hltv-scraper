@@ -17,7 +17,7 @@ map_history_file_path = "./processed-maps.json"
 # we use this so that the matrix is mutated, not replaced, within threads
 feature_data = SimpleNamespace()
 
-feature_data.matrix = np.empty([484, 0])
+feature_data.matrix = np.empty([509, 0])
 feature_data.history = set()
 
 try:
@@ -67,7 +67,7 @@ atexit.register(print_process_rate)
 
 num_maps = maps.count_documents({})
 
-thread_num = 32
+thread_num = 24
 
 slice_size = np.ceil(num_maps / thread_num)
 
