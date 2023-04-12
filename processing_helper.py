@@ -47,24 +47,17 @@ duel_map_threshold = 6 * month_delta
 #  as of 4/7/23, max observed ranking is 404
 max_ranking = 500
 
+min_date = maps.find({"date": {"$ne": None}}).sort("date").limit(1).next()["date"]
 
-def get_duels(team_one_ids, team_two_ids, date):
+
+def get_duels(team_one_ids, team_two_ids, date, performances):
     # there are 50 duels, one 5x5 with one side's kills, one 5x5 with the other side's kills
     duel_list = list(np.zeros((len(team_one_ids) * len(team_two_ids) * 2)))
-    duel_performances = maps.find(
-        {
-            "$and": [
-                {"date": {"$lt": date, "$gte": date - duel_map_threshold}},
-                {
-                    "players": {"$in": team_one_ids},
-                },
-                {
-                    "players": {"$in": team_two_ids},
-                },
-            ]
-        }
-    )
-    for performance in duel_performances:
+    absolute_duel_threshold = date - duel_map_threshold
+    for performance in performances:
+        print(performance["date"])
+        if performance["date"] < absolute_duel_threshold:
+            continue
         duel_idx = 0
         # if non-all duels desired, wrap this in another for loop that goes thru "all", "fk", "awp", etc
         for player_id in team_one_ids:
@@ -125,30 +118,13 @@ long_term_threshold = 9 * month_delta
 
 
 def get_map_stats(
-    team_one_ids, team_two_ids, date, map_name=None, thresholds=(map_rating_threshold)
+    team_one_ids,
+    team_two_ids,
+    date,
+    performances,
+    map_name=None,
+    thresholds=(map_rating_threshold),
 ):
-    performances = maps.find(
-        {
-            "$or": [
-                {
-                    # all maps within given date thresholds
-                    "$and": [
-                        {"date": {"$lt": date, "$gte": date - np.max(thresholds)}},
-                        {"players": {"$in": team_one_ids + team_two_ids}},
-                    ]
-                },
-                {
-                    # all maps with given map_name
-                    "$and": [
-                        {"mapType": map_name},
-                        {"date": {"$lt": date, "$gte": date - map_rating_threshold}},
-                        {"players": {"$in": team_one_ids + team_two_ids}},
-                    ]
-                },
-            ]
-        }
-    )
-
     # multidimensional list with these levels:
     # (1 + # given ones)x thresholds
     #   10x players
@@ -161,6 +137,7 @@ def get_map_stats(
     ]
 
     absolute_thresholds = tuple(map(lambda thresh: date - thresh, thresholds))
+    map_absolute_threshold = date - map_rating_threshold
 
     for performance in performances:
         player_idx = 0
@@ -174,7 +151,10 @@ def get_map_stats(
                 ct_rating = performance["teamTwoStats"][player_id]["ctStats"]["rating"]
                 t_rating = performance["teamTwoStats"][player_id]["tStats"]["rating"]
             if not (not ct_rating or not t_rating):
-                if performance["mapType"] == map_name:
+                if (
+                    performance["date"] <= map_absolute_threshold
+                    and performance["mapType"] == map_name
+                ):
                     results[0][player_idx][0].append(ct_rating)
                     results[0][player_idx][1].append(t_rating)
                 for i in range(len(absolute_thresholds)):
@@ -206,21 +186,13 @@ def get_map_stats(
 detailed_threshold = duel_map_threshold
 
 
-def get_detailed_stats(team_one_ids, team_two_ids, date):
+def get_detailed_stats(team_one_ids, team_two_ids, date, performances):
     detailed_stats = [[[], []] for x in range(len(team_one_ids + team_two_ids))]
-    performances = maps.find(
-        {
-            "$or": [
-                {
-                    "$and": [
-                        {"date": {"$lt": date, "$gte": date - detailed_threshold}},
-                        {"players": {"$in": team_one_ids + team_two_ids}},
-                    ]
-                },
-            ]
-        }
-    )
+
+    detailed_absolute_threshold = date - detailed_threshold
     for performance in performances:
+        if performance["date"] < detailed_absolute_threshold:
+            continue
         player_idx = 0
         for player_id in team_one_ids + team_two_ids:
             if player_id in performance["teamOneStats"]:
@@ -291,23 +263,23 @@ def get_detailed_stats(team_one_ids, team_two_ids, date):
     return stats_list
 
 
-def process_maps(maps, matrix_lock, history_lock, feature_data):
-    for curr_map in maps:
+def process_maps(maps_to_process, matrix_lock, history_lock, feature_data):
+    for curr_map in maps_to_process:
         with matrix_lock:
             if curr_map["hltvId"] in feature_data.history:
                 continue
         print("Processing map ID:", curr_map["hltvId"])
         w = []
-        related_match = matches.find_one({"hltvId": curr_map["matchId"]})
+        related_match = curr_map["match"][0]
         raw_date = related_match["date"]
         # datetime rounded to the minute
-        date = np.round(raw_date.timestamp() / 60, 0)
+        date = np.round((raw_date.timestamp() - min_date.timestamp()) / 360000, 5)
         w.append(date)
         # e.g bo1, bo3, etc
         format = related_match["numMaps"]
         w.append(format)
 
-        related_event = events.find_one({"hltvId": related_match["eventId"]})
+        related_event = curr_map["event"][0]
         # prizepool of event
         #  possibly too inconsistent to be useful, consider removing
         prizepool = related_event["prizePool"] or 0
@@ -340,11 +312,28 @@ def process_maps(maps, matrix_lock, history_lock, feature_data):
         #   the number of those maps is low so it cuts out outliers while also keeping param vector the same length
         if len(team_one_ids) != 5 or len(team_two_ids) != 5:
             continue
+
+        # this assumes that long_term_threshold is longer than all the others
+        performances = maps.find(
+            {
+                "$or": [
+                    {
+                        "$and": [
+                            {
+                                "date": {
+                                    "$lt": date,
+                                    "$gte": raw_date - long_term_threshold,
+                                }
+                            },
+                            {"players": {"$in": team_one_ids + team_two_ids}},
+                        ]
+                    },
+                ]
+            }
+        )
+
         # calculating duel maps for all of them
-        duels = get_duels(team_one_ids, team_two_ids, raw_date)
-        # for one_id in team_one_ids:
-        #     for two_id in team_two_ids:
-        #         duels.append(get_duel_sum(one_id, two_id, raw_date))
+        duels = get_duels(team_one_ids, team_two_ids, raw_date, performances)
         w += duels
         ranking_one = (
             max_ranking - curr_map["teamOneRanking"]
@@ -360,10 +349,12 @@ def process_maps(maps, matrix_lock, history_lock, feature_data):
         w.append(ranking_two)
 
         # big (280-length) array containing mean and stdev of almost all collected stats
+        # within this function and subsequent ones, important to put ct stats before t stats
         stats_list = get_map_stats(
             team_one_ids,
             team_two_ids,
             raw_date,
+            performances,
             map_name=curr_map["mapType"],
             thresholds=(
                 short_term_threshold,
@@ -373,8 +364,19 @@ def process_maps(maps, matrix_lock, history_lock, feature_data):
         )
         w += stats_list
 
-        detailed_stats = get_detailed_stats(team_one_ids, team_two_ids, raw_date)
+        detailed_stats = get_detailed_stats(
+            team_one_ids, team_two_ids, raw_date, performances
+        )
         w += detailed_stats
+
+        # map scores - to be taken out when needed during training/testing
+        w.append(curr_map["score"]["teamOne"]["ct"])
+        w.append(curr_map["score"]["teamOne"]["t"])
+        w.append(curr_map["score"]["teamOne"]["ot"])
+
+        w.append(curr_map["score"]["teamTwo"]["ct"])
+        w.append(curr_map["score"]["teamTwo"]["t"])
+        w.append(curr_map["score"]["teamTwo"]["ot"])
 
         with history_lock:
             feature_data.history.add(curr_map["hltvId"])

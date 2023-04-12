@@ -17,7 +17,7 @@ map_history_file_path = "./processed-maps.json"
 # we use this so that the matrix is mutated, not replaced, within threads
 feature_data = SimpleNamespace()
 
-feature_data.matrix = np.empty([509, 0])
+feature_data.matrix = np.empty([515, 0])
 feature_data.history = set()
 
 try:
@@ -67,7 +67,7 @@ atexit.register(print_process_rate)
 
 num_maps = maps.count_documents({})
 
-thread_num = 24
+thread_num = 64
 
 slice_size = np.ceil(num_maps / thread_num)
 
@@ -76,9 +76,29 @@ history_lock = threading.Lock()
 
 for i in range(thread_num):
     maps_slice = list(
-        maps.find(
-            {},
-        )[(slice_size * i) : np.min((slice_size * (i + 1), num_maps))]
+        maps.aggregate(
+            [
+                {
+                    "$lookup": {
+                        "from": "matches",
+                        "localField": "matchId",
+                        "foreignField": "hltvId",
+                        "as": "match",
+                    }
+                },
+                {
+                    "$lookup": {
+                        "from": "events",
+                        "localField": "match.0.eventId",
+                        "foreignField": "hltvId",
+                        "as": "event",
+                    }
+                },
+                {"$sort": {"date": 1}},
+                {"$skip": slice_size * i},
+                {"$limit": slice_size},
+            ]
+        )
     )
     threading.Thread(
         target=process_maps,
