@@ -264,10 +264,15 @@ def get_detailed_stats(team_one_ids, team_two_ids, date, performances):
 
 
 def process_maps(maps_to_process, matrix_lock, history_lock, feature_data):
+    local_history = set()
     for curr_map in maps_to_process:
-        with matrix_lock:
-            if curr_map["hltvId"] in feature_data.history:
+        if feature_data.history is None:
+            if curr_map["hltvId"] in local_history:
                 continue
+        else:
+            with history_lock:
+                if curr_map["hltvId"] in feature_data.history:
+                    continue
         print("Processing map ID:", curr_map["hltvId"])
         w = []
         related_match = curr_map["match"][0]
@@ -378,8 +383,16 @@ def process_maps(maps_to_process, matrix_lock, history_lock, feature_data):
         w.append(curr_map["score"]["teamTwo"]["t"])
         w.append(curr_map["score"]["teamTwo"]["ot"])
 
-        with history_lock:
-            feature_data.history.add(curr_map["hltvId"])
+        # these are just used for inspecting processed data, so we can find their sources. clipped out during training
+        w.append(curr_map["hltvId"])
+        w.append(related_match["hltvId"])
+
+        if feature_data.history is None:
+            local_history.add(curr_map["hltvId"])
+        else:
+            with history_lock:
+                feature_data.history.add(curr_map["hltvId"])
+
         with matrix_lock:
             feature_data.matrix = np.append(
                 feature_data.matrix, np.array([w]).T, axis=1
