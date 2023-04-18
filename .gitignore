@@ -9,3 +9,4 @@ log.txt
 matrix.npy
 processed-maps.json
 __pycache__
+*.sav

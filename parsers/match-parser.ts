@@ -170,7 +170,7 @@ export const parseMatch = async (
             const mapUrl = mapLink.attribs["href"];
             const mapId = Number(mapUrl.split("/")[4]);
             const map = await getMapByHltvId(mapId);
-            if (map) {
+            if (!CACHED && map) {
               console.log(
                 "Map ID " + mapId + " already in database, skipping."
               );

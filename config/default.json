@@ -1,6 +1,6 @@
 {
-  "scrapeCached": false,
-  "onlyScrapePlayed": false,
+  "scrapeCached": true,
+  "onlyScrapePlayed": true,
   "results": {
     "offset": 0,
     "finishUponDuplicate": true,

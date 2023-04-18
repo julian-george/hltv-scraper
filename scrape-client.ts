@@ -14,6 +14,7 @@ import { delay } from "./scrape-util.js";
 import { getQueue } from "./queues.js";
 
 dotenv.config();
+const CACHED = config.get("scrapeCached");
 const NUM_HEADFUL = config.get("browsers.numHeadful");
 const MAX_CHALLENGE_TRIES = config.get("browsers.maxChallengeAttempts");
 const BROWSER_LIMIT = config.get("browsers.limit");
@@ -108,29 +109,30 @@ const addNewBrowser = async (headful: boolean) => {
   );
 };
 
-(async () => {
-  ips = IP_URL
-    ? await (await fetch(IP_URL)).text()
-    : fs.readFileSync("ips.txt", { encoding: "utf8" });
-  ips = ips.split("\n");
-  // Removes the empty last line that these text files often have
-  ips = ips.filter((ip: string) => ip != "");
-  // Ensures that certain IPs don't get used and blocked more than others
-  ips = _.shuffle(ips);
-  if (WEBSHARE)
-    ips = ips.map((ip) => {
-      const splitted = ip.split(":");
-      return `${splitted[2]}:${splitted[3]}@${splitted[0]}:${splitted[1]}`;
-    });
-  const browserAdditions: Promise<void>[] = [];
-  for (let i = 0; i < BROWSER_LIMIT; i++) {
-    emptySlots.push(i);
-    const headful = i < NUM_HEADFUL;
-    browserAdditions.push(addNewBrowser(headful));
-  }
-  await Promise.all(browserAdditions);
-  allBrowsersCreated = true;
-})();
+!CACHED &&
+  (async () => {
+    ips = IP_URL
+      ? await (await fetch(IP_URL)).text()
+      : fs.readFileSync("ips.txt", { encoding: "utf8" });
+    ips = ips.split("\n");
+    // Removes the empty last line that these text files often have
+    ips = ips.filter((ip: string) => ip != "");
+    // Ensures that certain IPs don't get used and blocked more than others
+    ips = _.shuffle(ips);
+    if (WEBSHARE)
+      ips = ips.map((ip) => {
+        const splitted = ip.split(":");
+        return `${splitted[2]}:${splitted[3]}@${splitted[0]}:${splitted[1]}`;
+      });
+    const browserAdditions: Promise<void>[] = [];
+    for (let i = 0; i < BROWSER_LIMIT; i++) {
+      emptySlots.push(i);
+      const headful = i < NUM_HEADFUL;
+      browserAdditions.push(addNewBrowser(headful));
+    }
+    await Promise.all(browserAdditions);
+    allBrowsersCreated = true;
+  })();
 
 const removeBrowser = async (currBrowser, headful, url, err) => {
   console.error(

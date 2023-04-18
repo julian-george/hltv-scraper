@@ -28,7 +28,7 @@ export const scrapeResults = async ($: CheerioAPI, resultsUrl: string) => {
     const resultUrl = resultLink.attribs["href"];
     const matchId = Number(resultUrl.split("/")[2]);
     const match = await getMatchByHltvId(matchId);
-    if (match && !TRAVERSE_ADDED_MATCHES) {
+    if (!CACHED && match && !TRAVERSE_ADDED_MATCHES) {
       if (FINISH_UPON_DUPLICATE) {
         console.log("Match ID " + matchId + " already in database, aborting.");
         finished = true;

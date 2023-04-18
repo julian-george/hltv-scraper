@@ -122,7 +122,9 @@ const parseMap = async (
           ),
           deaths: Number(currRow.find(".st-deaths").text()),
           kast:
-            Number(currRow.find(".st-kdratio").text().replace("%", "")) * 0.01,
+            Math.round(
+              Number(currRow.find(".st-kdratio").text().replace("%", "")) * 10
+            ) / 1000,
           adr: Number(currRow.find(".st-adr").text()),
           fkDiff: Number(
             currRow
@@ -144,22 +146,26 @@ const parseMap = async (
       firstWon ? teamTwoStats : (teamOneStats = secondTeamStats);
     }
   }
-  if (!CACHED)
+  const newMap = {
+    hltvId: Number(hltvId),
+    matchId,
+    mapType,
+    score,
+    teamOneRanking,
+    teamTwoRanking,
+    teamOneStats,
+    teamTwoStats,
+    players,
+  };
+  if (!CACHED) {
     try {
-      return await createMap({
-        hltvId: Number(hltvId),
-        matchId,
-        mapType,
-        score,
-        teamOneRanking,
-        teamTwoRanking,
-        teamOneStats,
-        teamTwoStats,
-        players,
-      });
+      return await createMap(newMap);
     } catch (err) {
       throw new Error("Unable to add map ID " + hltvId + " to database: ", err);
     }
+  } else {
+    console.log("New map", newMap);
+  }
 };
 
 const parseMapPerformance = async ($: CheerioAPI) => {
