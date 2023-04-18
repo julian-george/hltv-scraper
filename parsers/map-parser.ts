@@ -134,6 +134,13 @@ const parseMap = async (
           ),
           rating: Number(currRow.find(".st-rating").text()),
         };
+        if (
+          isNaN(statObj.kast) ||
+          isNaN(statObj.adr) ||
+          isNaN(statObj.rating)
+        ) {
+          throw new Error("NaN value in player statObj");
+        }
         if (playerId in firstTeamStats) {
           firstTeamStats[playerId][statAttr] = statObj;
         } else if (playerId in secondTeamStats) {
