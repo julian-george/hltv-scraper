@@ -17,7 +17,7 @@ map_history_file_path = "./processed-maps.json"
 # we use this so that the matrix is mutated, not replaced, within threads
 feature_data = SimpleNamespace()
 
-feature_data.matrix = np.empty([567, 0])
+feature_data.matrix = np.empty([622, 0])
 feature_data.history = set()
 
 try:
@@ -36,6 +36,9 @@ except:
 
 
 def save_matrix():
+    # sorting matrix by hltvId to ensure lineup of different components
+    feature_data.matrix = feature_data.matrix[feature_data.matrix[:, 570].argsort()]
+
     matrix_file = open(matrix_file_path, "wb+")
     np.save(matrix_file, feature_data.matrix)
     matrix_file.close()
