@@ -3,6 +3,7 @@ import json
 import atexit
 import threading
 import numpy as np
+import pandas as pd
 from datetime import datetime
 from types import SimpleNamespace
 from processing_helper import process_maps
@@ -11,20 +12,116 @@ client = pymongo.MongoClient("mongodb://localhost:27017/")
 db = client["scraped-hltv"]
 maps = db["maps"]
 
-matrix_file_path = "./matrix.npy"
+frame_file_path = "./frame.csv"
 map_history_file_path = "./processed-maps.json"
 
 # we use this so that the matrix is mutated, not replaced, within threads
 feature_data = SimpleNamespace()
 
-feature_data.matrix = np.empty([622, 0])
+team_prefixes = ["team_one", "team_two"]
+sides = ["ct", "t"]
+
+column_names = [
+    "map_date",
+    "match_num_maps",
+    "event_prize_pool",
+    "online",
+    "event_team_rankings_mean",
+    "event_team_rankings_std",
+    "team_one_ranking",
+    "team_two_ranking",
+]
+
+column_names += [
+    "map_ancient",
+    "map_anubis",
+    "map_cache",
+    "map_cobblestone",
+    "map_dust2",
+    "map_inferno",
+    "map_mirage",
+    "map_nuke",
+    "map_overpass",
+    "map_train",
+    "map_vertigo",
+]
+
+column_names += [f"duel_team_one_{i}_{j}" for j in range(5) for i in range(5)]
+column_names += [f"duel_team_two_{i}_{j}" for j in range(5) for i in range(5)]
+
+stat_types = ["overall", "map", "event"]
+
+for pref in team_prefixes:
+    for type in stat_types:
+        column_names += [
+            f"{pref}_win_num_{type}",
+            f"{pref}_played_num_{type}",
+            f"{pref}_mean_rounds_{type}",
+        ]
+        if type == "event":
+            for side in sides:
+                column_names += [
+                    f"{pref}_player_{i}_{side}_rating_avg_event" for i in range(5)
+                ]
+
+time_ranges = ["short", "medium", "long", "map"]
+
+for time_range in time_ranges:
+    for pref in team_prefixes:
+        for side in sides:
+            column_names += [
+                f"{pref}_player_{i}_{side}_rating_avg_{time_range}" for i in range(5)
+            ]
+            column_names += [
+                f"{pref}_player_{i}_{side}_rating_std_{time_range}" for i in range(5)
+            ]
+        column_names += [
+            f"{pref}_player_{i}_maps_played_{time_range}" for i in range(5)
+        ]
+
+
+detailed_stats = ["kills", "hsKills", "assists", "deaths", "kast", "adr", "fkDiff"]
+
+for pref in team_prefixes:
+    for stat in detailed_stats:
+        for side in sides:
+            column_names += [f"{pref}_player_{i}_{side}_{stat}_avg" for i in range(5)]
+            column_names += [f"{pref}_player_{i}_{side}_{stat}_std" for i in range(5)]
+    column_names += [f"{pref}_player_{i}_maps_played_detailed" for i in range(5)]
+
+
+column_names += [
+    "team_one_win_num_matchup",
+    "teams_played_num_matchup",
+    "team_one_mean_rounds_matchup",
+    "team_two_mean_rounds_matchup",
+]
+
+for pref in team_prefixes:
+    for side in sides:
+        column_names += [
+            f"{pref}_player_{i}_{side}_rating_avg_matchup" for i in range(5)
+        ]
+
+column_names.append("winner")
+
+for pref in team_prefixes:
+    for side in sides + ["ot"]:
+        column_names.append(f"{pref}_score_{side}")
+
+column_names.append("map_id")
+column_names.append("match_id")
+
+# feature_data.matrix = np.empty([0, 630])
+feature_data.frame = pd.DataFrame(columns=column_names)
 feature_data.history = set()
+feature_data.to_exit = False
 
 try:
-    feature_data.matrix = np.load(matrix_file_path)
-    print("Feature matrix loaded, shape:", feature_data.matrix.shape)
+    feature_data.frame = pd.read_csv(frame_file_path)
+    print("Feature frame loaded, shape", feature_data.frame.shape)
 except:
-    print(f"Unable to load matrix from {matrix_file_path}.")
+    print(f"Unable to load frame from {frame_file_path}.")
 
 try:
     map_history_file = open(map_history_file_path, "r")
@@ -35,13 +132,13 @@ except:
     print(f"Unable to load map history from {map_history_file_path}")
 
 
-def save_matrix():
-    # sorting matrix by hltvId to ensure lineup of different components
-    feature_data.matrix = feature_data.matrix[feature_data.matrix[:, 570].argsort()]
+def signal_exit():
+    feature_data.to_exit = True
 
-    matrix_file = open(matrix_file_path, "wb+")
-    np.save(matrix_file, feature_data.matrix)
-    matrix_file.close()
+
+def save_frame():
+    feature_data.frame.sort_values(by=["map_id"])
+    feature_data.frame.to_csv(frame_file_path)
 
 
 def save_map_history():
@@ -66,18 +163,20 @@ def print_process_rate():
         print(f"Average of {maps_per_minute} processed per minute.")
 
 
-atexit.register(save_matrix)
+atexit.register(signal_exit)
 atexit.register(save_map_history)
+atexit.register(save_frame)
 atexit.register(print_process_rate)
 
 num_maps = maps.count_documents({})
 
-thread_num = 1
+thread_num = 90
 
 slice_size = np.ceil(num_maps / thread_num)
 
-matrix_lock = threading.Lock()
+frame_lock = threading.Lock()
 history_lock = threading.Lock()
+exit_lock = threading.Lock()
 
 for i in range(thread_num):
     maps_slice = maps.aggregate(
@@ -106,5 +205,11 @@ for i in range(thread_num):
 
     threading.Thread(
         target=process_maps,
-        args=(maps_slice, matrix_lock, history_lock, feature_data),
+        args=(
+            maps_slice,
+            frame_lock,
+            history_lock,
+            exit_lock,
+            feature_data,
+        ),
     ).start()

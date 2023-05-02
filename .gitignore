@@ -10,3 +10,5 @@ matrix.npy
 processed-maps.json
 __pycache__
 *.sav
+*.npy
+*.csv
