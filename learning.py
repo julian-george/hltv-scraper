@@ -1,7 +1,9 @@
 import pickle
+import traceback
 import numpy as np
 import tensorflow as tf
 import keras_tuner
+import dtreeviz
 import tensorflow_decision_forests as tfdf
 import pandas as pd
 from scipy import stats as st
@@ -11,118 +13,99 @@ from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import RobustScaler, StandardScaler
 import tensorflow_model_optimization as tfmot
+from learning_helper import process_frame
 
 
 # feature_matrix = np.empty([517, 0])
 num_ending_cols = 9
 
-frame_file_path = "frame.csv"
+frame_file_path = "saved-frame.csv"
+matrix_file_path = "cached-matrix.npy"
+
+
+feature_matrix = None
+feature_frame = None
+X = None
+y = None
+
+label = "winner"
+
+
+# taken from here: https://www.tensorflow.org/decision_forests/tutorials/dtreeviz_colab
+def split_dataset(dataset, test_ratio=0.30, seed=1234):
+    np.random.seed(seed)
+    test_indices = np.random.rand(len(dataset)) < test_ratio
+    return dataset[~test_indices], dataset[test_indices]
+
 
 try:
-    feature_matrix = pd.read_csv(frame_file_path).to_numpy()
-    print("Feature matrix loaded, shape:", feature_matrix.shape)
+    feature_matrix = np.load(matrix_file_path)
 except:
-    print(f"Unable to load matrix from {frame_file_path}.")
+    print("No feature matrix found, building from data frame")
+    try:
+        # low_memory=False to get rid of mixed-type warning
+        feature_frame = pd.read_csv(frame_file_path, index_col=[0], low_memory=False)
+        print("Feature frame loaded, shape:", feature_frame.shape)
+        (feature_frame, y) = process_frame(feature_frame, label)
+        # feature_frame.info(verbose=True)
+        feature_matrix = np.hstack(
+            [feature_frame.drop("winner", axis=1).to_numpy(), np.array([y]).T]
+        )
+        np.save(matrix_file_path, feature_matrix)
+    except Exception as e:
+        print(f"ERROR: Unable to load frame from {frame_file_path}.", e)
+        traceback.print_exc()
 
-# (adjusted) date rating 1.0 starts applying
-truncation_date = 14.197
-
-to_prune = []
-
-for data_row in feature_matrix:
-    if data_row[0] <= truncation_date:
-        to_prune.append(False)
-    else:
-        to_prune.append(True)
-
-feature_matrix = feature_matrix[to_prune]
-
-feature_matrix.tofile("matrix.csv", sep=",")
-
-print(feature_matrix[120, :])
-
-# matchup
-#  win rates
-# feature_matrix = np.delete(feature_matrix, slice(619, 621), axis=1)
-#  avg round num
-feature_matrix = np.delete(feature_matrix, slice(617, 619), axis=1)
-#  player ratings
-feature_matrix = np.delete(feature_matrix, slice(598, 617), axis=1)
-# event
-#  win rates
-feature_matrix = np.delete(feature_matrix, slice(593, 597), axis=1)
-#  round nums
-# feature_matrix = np.delete(feature_matrix, slice(591, 593), axis=1)
-#  player ratings
-feature_matrix = np.delete(feature_matrix, slice(571, 591), axis=1)
-# detailed stats
-feature_matrix = np.delete(feature_matrix, slice(281, 571), axis=1)
-# # long term
-feature_matrix = np.delete(feature_matrix, slice(231, 281), axis=1)
-# # medium term
-feature_matrix = np.delete(feature_matrix, slice(181, 231), axis=1)
-# # short term
-# feature_matrix = np.delete(feature_matrix, slice(131, 181), axis=1)
-#  num_valid
-feature_matrix = np.delete(feature_matrix, slice(131, 181, 5), axis=1)
-#  stdev
-feature_matrix = np.delete(feature_matrix, slice(132, 171, 2), axis=1)
-# map stats
-# feature_matrix = np.delete(feature_matrix, slice(81, 131), axis=1)
-#  num_valid
-feature_matrix = np.delete(feature_matrix, slice(81, 131, 5), axis=1)
-#  stdev
-feature_matrix = np.delete(feature_matrix, slice(82, 121, 2), axis=1)
-# non- avg round win stats
-#  map
-feature_matrix = np.delete(feature_matrix, slice(79, 81), axis=1)
-#  avg rounds
-feature_matrix = np.delete(feature_matrix, slice(77, 79), axis=1)
-feature_matrix = np.delete(feature_matrix, slice(75, 77), axis=1)
-#  general
-feature_matrix = np.delete(feature_matrix, slice(73, 75), axis=1)
-#  avg rounds
-feature_matrix = np.delete(feature_matrix, slice(71, 73), axis=1)
-feature_matrix = np.delete(feature_matrix, slice(69, 71), axis=1)
-# # duel map
-feature_matrix = np.delete(feature_matrix, slice(19, 69), axis=1)
-# # map vector
-feature_matrix = np.delete(feature_matrix, slice(8, 19), axis=1)
-# team rankings
-# feature_matrix = np.delete(feature_matrix, slice(6, 8), axis=1)
-# # team rankings std
-feature_matrix = np.delete(feature_matrix, 5, axis=1)
-# # team rankings mean
-feature_matrix = np.delete(feature_matrix, 4, axis=1)
-# online
-feature_matrix = np.delete(feature_matrix, 3, axis=1)
-# # prize pool
-feature_matrix = np.delete(feature_matrix, 2, axis=1)
-# numMaps
-feature_matrix = np.delete(feature_matrix, 1, axis=1)
-# # date
-feature_matrix = np.delete(feature_matrix, 0, axis=1)
+print("Feature matrix processed, shape:", feature_matrix.shape)
 
 
 clfs = []
 
-X = feature_matrix[:, :-num_ending_cols]
-y = feature_matrix[:, -num_ending_cols].T
-
+X = feature_matrix[:, :-1]
+y = feature_matrix[:, -1]
 
 X_train, X_test, y_train, y_test = train_test_split(X, y)
 
+if isinstance(feature_frame, pd.DataFrame):
+    feature_frame = feature_frame[(feature_frame[label] != 0.5)]
+
+# # Split into training and test sets
+# rf_train_pd, rf_test_pd = split_dataset(feature_frame)
+# print(
+#     f"{len(rf_train_pd)} examples in training, {len(rf_test_pd)} examples for testing."
+# )
+
+# classes = list(feature_frame[label].unique())
+
+
+# # Convert to tensorflow data sets
+# rf_train = tfdf.keras.pd_dataframe_to_tf_dataset(rf_train_pd, label=label)
+# rf_test = tfdf.keras.pd_dataframe_to_tf_dataset(rf_test_pd, label=label)
+
 # # Train a Random Forest model.
-# model = tfdf.keras.RandomForestModel()
-# model.fit(X_train, y_train)
+# rf_model = tfdf.keras.RandomForestModel(verbose=0, random_seed=1234)
+# rf_model.fit(rf_train)
 
-# # Summary of the model structure.
-# model.summary()
+# rf_model.compile(metrics=["accuracy"])
+# rf_model.evaluate(rf_test, return_dict=True, verbose=0)
 
-# # Evaluate the model.
-# model.evaluate(X_test, y_test)
+# # Tell dtreeviz about training data and model
+# rf_features = [f.name for f in rf_model.make_inspector().features()]
+# viz_rf_model = dtreeviz.model(
+#     rf_model,
+#     tree_index=3,
+#     X_train=rf_train_pd[rf_features],
+#     y_train=rf_train_pd[label],
+#     feature_names=rf_features,
+#     target_name=label,
+#     class_names=[0, 1],
+# )
+# viz_rf_model.view(scale=1.2)
 
-num_features = feature_matrix.shape[1]
+num_features = X.shape[1]
+
+normalization_layer = keras.layers.Normalization()
+normalization_layer.adapt(X_train)
 
 
 def build_model(hp=None):
@@ -146,14 +129,16 @@ def build_model(hp=None):
         else default_activation
     )
 
-    inputs = keras.Input((num_features - num_ending_cols))
-    x = inputs
+    layer_list = []
 
-    for l_i in range(layer_num):
-        x = keras.layers.Dense(layer_size, activation_function)(x)
+    layer_list.append(normalization_layer)
+    layer_list.append(keras.layers.Dense(num_features, activation_function))
 
-    outputs = keras.layers.Dense(2, activation="softmax")(x)
-    model = keras.Model(inputs, outputs)
+    for l_i in range(layer_num - 1):
+        layer_list.append(keras.layers.Dense(layer_size, activation_function))
+
+    layer_list.append(keras.layers.Dense(2, activation="softmax"))
+    model = keras.Sequential(layer_list)
     model.summary()
     opt = keras.optimizers.Adam(learning_rate=0.005)
     model.compile(
@@ -165,18 +150,16 @@ def build_model(hp=None):
     return model
 
 
-normalization_layer = keras.layers.Normalization()
-normalization_layer.adapt(X_train)
-
-normalized_X = normalization_layer(X_train)
-# normalized_X = X
+# normalized_X = normalization_layer(X_train)
+normalized_X = X_train
 
 batch_size = 64
 epoch_num = 20
 validation_split = 0.1
 stop_early = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3)
 scores = []
-for i in range(3):
+model = None
+for i in range(1):
     model = build_model()
     history = model.fit(
         normalized_X,
@@ -186,8 +169,15 @@ for i in range(3):
         epochs=epoch_num,
         callbacks=[stop_early],
     )
-    scores.append(model.evaluate(normalization_layer(X_test), y_test)[1])
+    scores.append(model.evaluate(X_test, y_test)[1])
 print(np.mean(scores))
+
+print(np.array([X_test[0]]).shape)
+
+model_path = "prediction_model"
+
+print("Saving Model")
+model.save(model_path)
 
 # base_line_loss = np.min(history.history["val_loss"])
 # loss_threshold = 0.005

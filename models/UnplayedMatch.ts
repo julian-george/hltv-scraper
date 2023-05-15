@@ -11,13 +11,12 @@ export const unplayedMatchSchema = new Schema({
   title: String,
   date: Date,
   format: String,
+  numMaps: Number,
   online: Boolean,
   // i.e. grand final, quarterfinal, swiss stage, etc
   matchType: String,
-  rankings: {
-    firstTeam: Number,
-    secondTeam: Number,
-  },
+  teamOneRanking: Number,
+  teamTwoRanking: Number,
   players: {
     firstTeam: [Number],
     secondTeam: [Number],

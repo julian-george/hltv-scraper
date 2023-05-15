@@ -296,7 +296,9 @@ export const parseMatch = async (
         format,
         online,
         matchType,
-        rankings,
+        numMaps,
+        teamOneRanking: rankings.firstTeam,
+        teamTwoRanking: rankings.secondTeam,
         players,
       });
       return;
@@ -310,7 +312,9 @@ export const parseMatch = async (
         format,
         online,
         matchType,
-        rankings,
+        numMaps,
+        teamOneRanking: rankings.firstTeam,
+        teamTwoRanking: rankings.secondTeam,
         players,
       });
     } catch (err) {

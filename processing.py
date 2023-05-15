@@ -4,6 +4,7 @@ import atexit
 import threading
 import numpy as np
 import pandas as pd
+import time
 from datetime import datetime
 from types import SimpleNamespace
 from processing_helper import process_maps
@@ -33,17 +34,17 @@ column_names = [
 ]
 
 column_names += [
-    "map_ancient",
-    "map_anubis",
-    "map_cache",
-    "map_cobblestone",
-    "map_dust2",
-    "map_inferno",
-    "map_mirage",
-    "map_nuke",
-    "map_overpass",
-    "map_train",
-    "map_vertigo",
+    "map_ancient_bool",
+    "map_anubis_bool",
+    "map_cache_bool",
+    "map_cobblestone_bool",
+    "map_dust2_bool",
+    "map_inferno_bool",
+    "map_mirage_bool",
+    "map_nuke_bool",
+    "map_overpass_bool",
+    "map_train_bool",
+    "map_vertigo_bool",
 ]
 
 column_names += [f"duel_team_one_{i}_{j}" for j in range(5) for i in range(5)]
@@ -115,10 +116,11 @@ column_names.append("match_id")
 # feature_data.matrix = np.empty([0, 630])
 feature_data.frame = pd.DataFrame(columns=column_names)
 feature_data.history = set()
+# feature_data.history = None
 feature_data.to_exit = False
 
 try:
-    feature_data.frame = pd.read_csv(frame_file_path)
+    feature_data.frame = pd.read_csv(frame_file_path, index_col=[0])
     print("Feature frame loaded, shape", feature_data.frame.shape)
 except:
     print(f"Unable to load frame from {frame_file_path}.")
@@ -137,6 +139,7 @@ def signal_exit():
 
 
 def save_frame():
+    print(f"Saving frame to {frame_file_path}, shape", feature_data.frame.shape)
     feature_data.frame.sort_values(by=["map_id"])
     feature_data.frame.to_csv(frame_file_path)
 
@@ -170,7 +173,7 @@ atexit.register(print_process_rate)
 
 num_maps = maps.count_documents({})
 
-thread_num = 90
+thread_num = 80
 
 slice_size = np.ceil(num_maps / thread_num)
 
@@ -179,37 +182,34 @@ history_lock = threading.Lock()
 exit_lock = threading.Lock()
 
 for i in range(thread_num):
-    maps_slice = maps.aggregate(
-        [
-            {
-                "$lookup": {
-                    "from": "matches",
-                    "localField": "matchId",
-                    "foreignField": "hltvId",
-                    "as": "match",
-                }
-            },
-            {
-                "$lookup": {
-                    "from": "events",
-                    "localField": "match.0.eventId",
-                    "foreignField": "hltvId",
-                    "as": "event",
-                }
-            },
-            {"$sort": {"date": -1}},
-            {"$skip": slice_size * i},
-            {"$limit": slice_size},
-        ]
+    maps_slice = list(
+        maps.aggregate(
+            [
+                {
+                    "$lookup": {
+                        "from": "matches",
+                        "localField": "matchId",
+                        "foreignField": "hltvId",
+                        "as": "match",
+                    }
+                },
+                {
+                    "$lookup": {
+                        "from": "events",
+                        "localField": "match.0.eventId",
+                        "foreignField": "hltvId",
+                        "as": "event",
+                    }
+                },
+                {"$sort": {"date": -1}},
+                {"$skip": slice_size * i},
+                {"$limit": slice_size},
+            ]
+        )
     )
 
     threading.Thread(
         target=process_maps,
-        args=(
-            maps_slice,
-            frame_lock,
-            history_lock,
-            exit_lock,
-            feature_data,
-        ),
+        args=(maps_slice, frame_lock, history_lock, exit_lock, feature_data, i),
     ).start()
+    time.sleep(1.5)
