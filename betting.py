@@ -23,10 +23,10 @@ small_bet_percent = 0.01
 service = Service(executable_path=ChromeDriverManager().install())
 options = ChromeOptions()
 # options.add_argument("--no-sandbox")
-options.add_argument(
-    "user-data-dir=/Users/julian/Library/Application Support/Google/Chrome/"
-)
-options.add_argument("--profile-directory=Profile 1")
+# options.add_argument(
+#     "user-data-dir=/Users/julian/Library/Application Support/Google/Chrome/"
+# )
+# options.add_argument("--profile-directory=Profile 1")
 options.add_argument("--disable-dev-shm-usage")
 options.add_argument("--disable-extensions")
 
