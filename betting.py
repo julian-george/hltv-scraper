@@ -250,4 +250,5 @@ while True:
         sleep_length = make_bets()
     except Exception as e:
         print("Error while betting", e)
+    print("Sleeping until", str(datetime.now() + timedelta(seconds=sleep_length)))
     sleep(sleep_length)
