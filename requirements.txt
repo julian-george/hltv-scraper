@@ -1,5 +1,5 @@
 pymongo
-tensorflow
+tensorflow-cpu
 webdriver_manager
 selenium
 pyvirtualdisplay
