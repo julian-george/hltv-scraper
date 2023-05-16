@@ -1,11 +1,13 @@
 import pymongo
 import os
+from dotenv import load_dotenv
 import numpy as np
 import pandas as pd
 from datetime import timedelta
 
-num_pools = 80
+load_dotenv()
 
+num_pools = 80
 
 client = pymongo.MongoClient(
     os.environ["MONGODB_URI"], maxPoolSize=num_pools + 8, minPoolSize=num_pools

@@ -8,12 +8,8 @@ from sklearn.model_selection import train_test_split
 from learning_helper import process_frame
 
 
-# feature_matrix = np.empty([517, 0])
-num_ending_cols = 9
-
 frame_file_path = "saved-frame.csv"
 matrix_file_path = "cached-matrix.npy"
-
 
 feature_matrix = None
 feature_frame = None
@@ -37,6 +33,7 @@ except:
     try:
         # low_memory=False to get rid of mixed-type warning
         feature_frame = pd.read_csv(frame_file_path, index_col=[0], low_memory=False)
+        feature_frame = feature_frame[(feature_frame[label] != 0.5)]
         print("Feature frame loaded, shape:", feature_frame.shape)
         (feature_frame, y) = process_frame(feature_frame, label)
         # feature_frame.info(verbose=True)
@@ -57,9 +54,6 @@ X = feature_matrix[:, :-1]
 y = feature_matrix[:, -1]
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1)
-
-if isinstance(feature_frame, pd.DataFrame):
-    feature_frame = feature_frame[(feature_frame[label] != 0.5)]
 
 # # Split into training and test sets
 # rf_train_pd, rf_test_pd = split_dataset(feature_frame)

@@ -11,7 +11,7 @@ delete_keywords = [
     "detailed",
     "score",
     "id",
-    "std",
+    # "std",
     "_medium",
     "_long",
     "map_date",
