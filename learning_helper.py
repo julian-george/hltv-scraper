@@ -15,7 +15,7 @@ delete_keywords = [
     "_medium",
     "_long",
     "map_date",
-    "_bool",
+    # "_bool",
 ]
 
 # (adjusted) date rating 1.0 starts applying

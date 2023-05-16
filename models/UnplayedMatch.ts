@@ -17,9 +17,14 @@ export const unplayedMatchSchema = new Schema({
   matchType: String,
   teamOneRanking: Number,
   teamTwoRanking: Number,
+  matchUrl: String,
   players: {
     firstTeam: [Number],
     secondTeam: [Number],
+  },
+  betted: {
+    type: Boolean,
+    default: false,
   },
 });
 

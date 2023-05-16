@@ -64,7 +64,7 @@ clfs = []
 X = feature_matrix[:, :-1]
 y = feature_matrix[:, -1]
 
-X_train, X_test, y_train, y_test = train_test_split(X, y)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1)
 
 if isinstance(feature_frame, pd.DataFrame):
     feature_frame = feature_frame[(feature_frame[label] != 0.5)]
@@ -140,7 +140,7 @@ def build_model(hp=None):
     layer_list.append(keras.layers.Dense(2, activation="softmax"))
     model = keras.Sequential(layer_list)
     model.summary()
-    opt = keras.optimizers.Adam(learning_rate=0.005)
+    opt = keras.optimizers.Adam(learning_rate=0.001)
     model.compile(
         optimizer=opt,
         loss="sparse_categorical_crossentropy",
