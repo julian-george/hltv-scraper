@@ -1,4 +1,5 @@
 import pymongo
+import os
 from time import sleep
 from datetime import datetime, timedelta
 from webdriver_manager.chrome import ChromeDriverManager
@@ -23,10 +24,8 @@ small_bet_percent = 0.01
 service = Service(executable_path=ChromeDriverManager().install())
 options = ChromeOptions()
 # options.add_argument("--no-sandbox")
-# options.add_argument(
-#     "user-data-dir=/Users/julian/Library/Application Support/Google/Chrome/"
-# )
-# options.add_argument("--profile-directory=Profile 1")
+options.add_argument(f"user-data-dir={os.environ['CHROME_PROFILE_DIR']}")
+options.add_argument(f"--profile-directory={os.environ['CHROME_PROFILE']}")
 options.add_argument("--disable-dev-shm-usage")
 options.add_argument("--disable-extensions")
 
@@ -94,6 +93,7 @@ def make_bets():
             print("Past threshold, ending.")
             if sleep_length == None:
                 sleep_length = (match_date - now).total_seconds() - 600
+            browser.close()
             return sleep_length
         home_team = (
             WebDriverWait(browser, 10)
