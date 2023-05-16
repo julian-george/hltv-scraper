@@ -5,11 +5,12 @@ import threading
 import numpy as np
 import pandas as pd
 import time
+import os
 from datetime import datetime
 from types import SimpleNamespace
 from processing_helper import process_maps
 
-client = pymongo.MongoClient("mongodb://localhost:27017/")
+client = pymongo.MongoClient(os.environ["MONGODB_URI"])
 db = client["scraped-hltv"]
 maps = db["maps"]
 

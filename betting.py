@@ -39,8 +39,12 @@ def login(browser):
     google_ele.click()
 
 
+urls_to_skip = []
+
+
 def make_bets():
-    options.add_argument("--headless")
+    sleep_length = None
+    # options.add_argument("--headless")
     browser = Chrome(service=service, options=options)
     browser.get("https://thunderpick.io/en/esports/csgo")
     # if this doesn't exist, we aren't signed in
@@ -58,7 +62,7 @@ def make_bets():
         browser.find_element(By.CSS_SELECTOR, "div.wallet-select__value>span").text
     )
 
-    print("Balance: $", total_balance)
+    print("Balance: $" + str(total_balance))
 
     match_urls = list(
         map(
@@ -66,22 +70,31 @@ def make_bets():
             browser.find_elements(By.CSS_SELECTOR, "a.match-row__total-markets"),
         )
     )
+    match_urls = [url for url in match_urls if not url in urls_to_skip]
 
-    for url in match_urls:
-        browser.get(url)
-        match_date = (
-            WebDriverWait(browser, 10)
-            .until(
-                EC.presence_of_element_located((By.CLASS_NAME, "match-header__date"))
+    for bet_url in match_urls:
+        browser.get(bet_url)
+        match_date = None
+        try:
+            match_date = (
+                WebDriverWait(browser, 10)
+                .until(
+                    EC.presence_of_element_located(
+                        (By.CLASS_NAME, "match-header__date")
+                    )
+                )
+                .text
             )
-            .text
-        )
-        match_date = datetime.strptime(
-            current_year + " " + match_date, "%Y %B %d, %H:%M"
-        )
+            match_date = datetime.strptime(
+                current_year + " " + match_date, "%Y %B %d, %H:%M"
+            )
+        except:
+            match_date = now
         if match_date - now > prediction_threshold:
             print("Past threshold, ending.")
-            break
+            if sleep_length == None:
+                sleep_length = (match_date - now).total_seconds() - 600
+            return sleep_length
         home_team = (
             WebDriverWait(browser, 10)
             .until(
@@ -101,7 +114,8 @@ def make_bets():
             .text
         )
         (predictions, match) = predict_match(home_team, away_team)
-        if match == None:
+        if match == None or len(match["betted"]) == match["numMaps"]:
+            urls_to_skip.append(bet_url)
             continue
         browser.get("https://www.hltv.org" + match["matchUrl"])
         map_names = list(
@@ -112,7 +126,7 @@ def make_bets():
                 ),
             ),
         )
-        browser.get(url)
+        browser.get(bet_url)
         market_elements = WebDriverWait(browser, 10).until(
             EC.presence_of_all_elements_located(
                 (
@@ -133,7 +147,7 @@ def make_bets():
                 .text
             )
             for i in range(1, 4):
-                if market_title == f"Map {i} Winner":
+                if market_title == f"Map {i} Winner" and not i in match["betted"]:
                     home_button = market_element.find_element(
                         By.CSS_SELECTOR, "button.odds-button--home-type"
                     )
@@ -147,6 +161,8 @@ def make_bets():
                             - 1
                         )
                     except:
+                        # in this case, the betting is locked and we haven't yet been able to bet on it, so we set the returned sleep length to this
+                        sleep_length = 60
                         continue
                     away_button = market_element.find_element(
                         By.CSS_SELECTOR, "button.odds-button--away-type"
@@ -168,13 +184,15 @@ def make_bets():
                         # browser.execute_script(
                         #     "scroll(0,arguments[0])", away_button.rect["y"]
                         # )
+                        home_win = False
                         if (
-                            predictions[curr_map][0] >= 0.5
+                            predictions[curr_map][0] >= 0.4
                             and predictions[curr_map][0] >= home_odds
                         ):
+                            home_win = True
                             home_button.click()
                         elif (
-                            predictions[curr_map][1] >= 0.5
+                            predictions[curr_map][1] >= 0.4
                             and predictions[curr_map][1] >= away_odds
                         ):
                             away_button.click()
@@ -187,7 +205,17 @@ def make_bets():
                                     )
                                 )
                             )
-                            pending_bet_input.send_keys(total_balance * bet_percent)
+                            amount_to_bet = total_balance * (
+                                bet_percent
+                                if (
+                                    (home_win and predictions[curr_map][0] >= 0.6)
+                                    or (
+                                        not home_win and predictions[curr_map][1] >= 0.6
+                                    )
+                                )
+                                else small_bet_percent
+                            )
+                            pending_bet_input.send_keys(amount_to_bet)
                             submit_button = browser.find_element(
                                 By.CLASS_NAME, "bet-slip__floating-button"
                             )
@@ -202,7 +230,7 @@ def make_bets():
                                     )
                                 )
                             )
-                            confirm_bet(match["hltvId"])
+                            confirm_bet(match["hltvId"], i)
 
                         except:
                             close_buttons = browser.find_elements(
@@ -213,11 +241,13 @@ def make_bets():
                             print(f"No bet made on map {i}")
 
     browser.close()
+    return sleep_length
 
 
 while True:
+    sleep_length = 60
     try:
-        make_bets()
+        sleep_length = make_bets()
     except Exception as e:
         print("Error while betting", e)
-    sleep(150)
+    sleep(sleep_length)

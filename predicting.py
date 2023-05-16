@@ -2,10 +2,12 @@ import pymongo
 import re
 import pandas as pd
 import tensorflow as tf
+import os
 from processing_helper import generate_data_point
 from learning_helper import process_frame
 
-client = pymongo.MongoClient("mongodb://localhost:27017/")
+
+client = pymongo.MongoClient(os.environ["MONGODB_URI"])
 db = client["scraped-hltv"]
 unplayed_matches = db["unplayedmatches"]
 
@@ -14,7 +16,7 @@ model = tf.keras.models.load_model(model_name)
 
 # conditions to be added to aggregation pipeline
 aggregate_list = [
-    {"$match": {"betted": False}},
+    # {"$match": {"betted": {"$size": 0}}},
     {
         "$lookup": {
             "from": "events",
@@ -39,7 +41,7 @@ map_types = [
 
 
 def trim_team_name(team_name):
-    team_name = team_name.replace("Gaming", "").replace("GG", "")
+    team_name = team_name.replace("Gaming", "").replace("GG", "").replace("Team", "")
     team_name = re.sub(" +", " ", team_name).strip()
     return team_name
 
@@ -91,6 +93,5 @@ for title, pred in all_predictions.items():
         print("\t", map_name, odds)
 
 
-def confirm_bet(matchId):
-    print(matchId)
-    unplayed_matches.update_one({"hltvId": matchId}, {"$set": {"betted": True}})
+def confirm_bet(matchId, map_num):
+    unplayed_matches.update_one({"hltvId": matchId}, {"$push": {"betted": map_num}})

@@ -1,4 +1,5 @@
 import pymongo
+import os
 import numpy as np
 import pandas as pd
 from datetime import timedelta
@@ -7,7 +8,7 @@ num_pools = 80
 
 
 client = pymongo.MongoClient(
-    "mongodb://localhost:27017/", maxPoolSize=num_pools + 8, minPoolSize=num_pools
+    os.environ["MONGODB_URI"], maxPoolSize=num_pools + 8, minPoolSize=num_pools
 )
 print("Helper client connected")
 db = client["scraped-hltv"]
