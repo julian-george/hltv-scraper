@@ -1,5 +1,6 @@
 import pymongo
 import re
+import sys
 import pandas as pd
 import tensorflow as tf
 import os
@@ -87,11 +88,12 @@ def predict_all_matches():
     return predictions
 
 
-all_predictions = predict_all_matches()
-for title, pred in all_predictions.items():
-    print(title)
-    for map_name, odds in pred.items():
-        print("\t", map_name, odds)
+if len(sys.argv) == 2 and sys.argv[1] == "all":
+    all_predictions = predict_all_matches()
+    for title, pred in all_predictions.items():
+        print(title)
+        for map_name, odds in pred.items():
+            print("\t", map_name, odds)
 
 
 def confirm_bet(matchId, map_num):
