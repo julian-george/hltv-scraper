@@ -320,7 +320,6 @@ export const parseMatch = async (
         matchUrl,
         players,
       });
-      console.log("adding unplayedmatch", matchUrl, newMatch);
       return newMatch;
     } catch (err) {
       throw new Error(

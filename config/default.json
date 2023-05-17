@@ -8,7 +8,7 @@
   },
   "unplayedMatches": {
     "daysToScrape": 3,
-    "overwrite": true
+    "overwrite": false
   },
   "browsers": {
     "limit": 28,

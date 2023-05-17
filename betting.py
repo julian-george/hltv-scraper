@@ -23,10 +23,12 @@ small_bet_percent = 0.01
 
 service = Service(executable_path=ChromeDriverManager().install())
 options = ChromeOptions()
-# options.add_argument("--no-sandbox")
+options.add_argument("--no-sandbox")
 options.add_argument(f"user-data-dir={os.environ['CHROME_PROFILE_DIR']}")
 options.add_argument(f"--profile-directory={os.environ['CHROME_PROFILE']}")
 options.add_argument("--disable-dev-shm-usage")
+options.add_argument("--disable-infobars")
+options.add_argument("--remote-debugging-port=9222")
 options.add_argument("--disable-extensions")
 
 
@@ -115,7 +117,6 @@ def make_bets():
             .text
         )
         (predictions, match) = predict_match(home_team, away_team)
-        print(match)
         if match == None or len(match["betted"]) == match["numMaps"]:
             urls_to_skip.append(bet_url)
             continue

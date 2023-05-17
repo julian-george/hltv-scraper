@@ -98,49 +98,49 @@ export const scrapeMatches = async ($: CheerioAPI, matchesUrl: string) => {
     0,
     DAYS_TO_SCRAPE
   );
-  console.log("sectiuon num", matchSections.length);
+  let matchLinks = $("div.liveMatch > a.match").toArray();
   for (const section of matchSections) {
-    const matchLinks = $(section).find("div.upcomingMatch > a.match");
-    console.log("matchlinks", matchLinks.length);
-    for (const matchLink of matchLinks) {
-      const matchUrl = matchLink.attribs["href"];
-      console.log(matchUrl);
-      const matchId = Number(matchUrl.split("/")[2]);
-      if (!OVERWRITE_MATCHES) {
-        const match = await getUnplayedMatchByHltvId(matchId);
-        if (match) {
-          console.log(
-            "Unplayed match ID " + matchId + " already in database, skipping."
-          );
-          continue;
-        }
+    matchLinks = [
+      ...matchLinks,
+      ...$(section).find("div.upcomingMatch > a.match").toArray(),
+    ];
+  }
+  for (const matchLink of matchLinks) {
+    const matchUrl = matchLink.attribs["href"];
+    const matchId = Number(matchUrl.split("/")[2]);
+    if (!OVERWRITE_MATCHES) {
+      const match = await getUnplayedMatchByHltvId(matchId);
+      if (match) {
+        console.log(
+          "Unplayed match ID " + matchId + " already in database, skipping."
+        );
+        continue;
       }
-      const matchExecutor = async () => {
-        const matchPage = !CACHED
-          ? await puppeteerGet(matchUrl, matchesUrl)
-          : fs.readFileSync("cached/match-page.html");
-        if (!fs.existsSync("cached/match-page.html")) {
-          fs.writeFile("cached/match-page.html", matchPage, (err) => {
-            if (err) throw err;
-          });
-        }
-        console.log("parsing", matchUrl);
-        if (matchPage)
-          await parseMatch(load(matchPage), matchId, matchUrl, false).catch(
-            (err) => {
-              console.error(
-                "Error while parsing match ID " +
-                  matchId +
-                  ", reason: '" +
-                  err +
-                  "'."
-              );
-            }
-          );
-        return true;
-      };
-      matchExecutors.push(matchExecutor);
     }
+    const matchExecutor = async () => {
+      const matchPage = !CACHED
+        ? await puppeteerGet(matchUrl, matchesUrl)
+        : fs.readFileSync("cached/match-page.html");
+      if (!fs.existsSync("cached/match-page.html")) {
+        fs.writeFile("cached/match-page.html", matchPage, (err) => {
+          if (err) throw err;
+        });
+      }
+      if (matchPage)
+        await parseMatch(load(matchPage), matchId, matchUrl, false).catch(
+          (err) => {
+            console.error(
+              "Error while parsing match ID " +
+                matchId +
+                ", reason: '" +
+                err +
+                "'."
+            );
+          }
+        );
+      return true;
+    };
+    matchExecutors.push(matchExecutor);
   }
   const matchStart = Date.now();
   // For debug: if you ever want to test matches sequentially
