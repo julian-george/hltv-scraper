@@ -98,10 +98,13 @@ export const scrapeMatches = async ($: CheerioAPI, matchesUrl: string) => {
     0,
     DAYS_TO_SCRAPE
   );
+  console.log("sectiuon num", matchSections.length);
   for (const section of matchSections) {
     const matchLinks = $(section).find("div.upcomingMatch > a.match");
+    console.log("matchlinks", matchLinks.length);
     for (const matchLink of matchLinks) {
       const matchUrl = matchLink.attribs["href"];
+      console.log(matchUrl);
       const matchId = Number(matchUrl.split("/")[2]);
       if (!OVERWRITE_MATCHES) {
         const match = await getUnplayedMatchByHltvId(matchId);
@@ -121,6 +124,7 @@ export const scrapeMatches = async ($: CheerioAPI, matchesUrl: string) => {
             if (err) throw err;
           });
         }
+        console.log("parsing", matchUrl);
         if (matchPage)
           await parseMatch(load(matchPage), matchId, matchUrl, false).catch(
             (err) => {

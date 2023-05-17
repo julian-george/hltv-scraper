@@ -43,6 +43,7 @@ map_types = [
 def trim_team_name(team_name):
     team_name = team_name.replace("Gaming", "").replace("GG", "").replace("Team", "")
     team_name = re.sub(" +", " ", team_name).strip()
+    team_name = team_name.lower()
     return team_name
 
 
@@ -86,11 +87,11 @@ def predict_all_matches():
     return predictions
 
 
-# all_predictions = predict_all_matches()
-# for title, pred in all_predictions.items():
-#     print(title)
-#     for map_name, odds in pred.items():
-#         print("\t", map_name, odds)
+all_predictions = predict_all_matches()
+for title, pred in all_predictions.items():
+    print(title)
+    for map_name, odds in pred.items():
+        print("\t", map_name, odds)
 
 
 def confirm_bet(matchId, map_num):

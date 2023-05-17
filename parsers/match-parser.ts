@@ -37,6 +37,7 @@ export const parseMatch = async (
       $(".team1-gradient > a > .teamName").text() +
       " vs. " +
       $(".team2-gradient > a > .teamName").text();
+    title = title.toLowerCase();
   } catch {}
   let date = null;
   try {
@@ -305,7 +306,7 @@ export const parseMatch = async (
       return;
     }
     try {
-      return await createUnplayedMatch({
+      const newMatch = await createUnplayedMatch({
         hltvId,
         title,
         eventId,
@@ -319,6 +320,8 @@ export const parseMatch = async (
         matchUrl,
         players,
       });
+      console.log("adding unplayedmatch", matchUrl, newMatch);
+      return newMatch;
     } catch (err) {
       throw new Error(
         `Unable to add unplayed match ID ${hltvId} to the database:`,

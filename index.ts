@@ -48,6 +48,7 @@ process.on("SIGINT", () => {
           if (err) throw err;
         });
       }
+      console.log("scraping matches");
       await scrapeMatches(load(matchesPage), initialMatchesUrl);
     } catch (err) {
       console.error("Unable to scrape matches browser");

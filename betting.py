@@ -31,8 +31,6 @@ options.add_argument("--disable-extensions")
 
 
 def login(browser):
-    # login_ele = browser.find_element(By.CSS_SELECTOR, ".auth-menu__login-button > a")
-    # login_ele.click()
     browser.get("https://thunderpick.io/en/esports?login=true")
     google_ele = browser.find_element(By.CSS_SELECTOR, ".social-btn--google")
     google_ele.click()
@@ -51,7 +49,8 @@ def make_bets():
         user_element = browser.find_element(By.CLASS_NAME, "user-summary")
     except:
         print("Trying to log in...")
-        # login(browser)
+        login(browser)
+        browser.implicitly_wait(15)
 
     now = datetime.now()
     current_year = str(datetime.now().year)
@@ -90,7 +89,9 @@ def make_bets():
         except:
             match_date = now
         if match_date - now > prediction_threshold:
-            print("Past threshold, ending.")
+            if bet_url == match_urls[0]:
+                continue
+            print("Past threshold, ending until bet at", bet_url)
             if sleep_length == None:
                 sleep_length = (match_date - now).total_seconds() - 600
             browser.close()
@@ -114,6 +115,7 @@ def make_bets():
             .text
         )
         (predictions, match) = predict_match(home_team, away_team)
+        print(match)
         if match == None or len(match["betted"]) == match["numMaps"]:
             urls_to_skip.append(bet_url)
             continue
@@ -147,6 +149,7 @@ def make_bets():
                 .text
             )
             for i in range(1, 4):
+                print(match["betted"])
                 if market_title == f"Map {i} Winner" and not i in match["betted"]:
                     home_button = market_element.find_element(
                         By.CSS_SELECTOR, "button.odds-button--home-type"
@@ -196,7 +199,10 @@ def make_bets():
                             and predictions[curr_map][1] >= away_odds
                         ):
                             away_button.click()
+                        else:
+                            print("No bet made.")
                         try:
+                            print("Making bet")
                             pending_bet_input = WebDriverWait(browser, 10).until(
                                 EC.presence_of_element_located(
                                     (

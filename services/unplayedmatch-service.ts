@@ -16,7 +16,7 @@ export const deleteUnplayedMatchByHltvId = async (id: number) => {
 
 export const createUnplayedMatch = async (match) => {
   return await insertWrapper(() =>
-    UnplayedMatch.updateOne({ hltvId: match.hltvId }, match, {
+    UnplayedMatch.findOneAndUpdate({ hltvId: match.hltvId }, match, {
       upsert: true,
     }).exec()
   );
