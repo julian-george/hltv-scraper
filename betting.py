@@ -28,7 +28,6 @@ options.add_argument(f"user-data-dir={os.environ['CHROME_PROFILE_DIR']}")
 options.add_argument(f"--profile-directory={os.environ['CHROME_PROFILE']}")
 options.add_argument("--disable-dev-shm-usage")
 options.add_argument("--disable-infobars")
-options.add_argument("--remote-debugging-port=9222")
 options.add_argument("--disable-extensions")
 
 
