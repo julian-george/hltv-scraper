@@ -151,9 +151,7 @@ def make_bets():
             )
         )
         sleep(0.5)
-        market_map_num = market_element.find_element(
-            By.CLASS_NAME, "match-header__bo"
-        ).text
+        market_map_num = browser.find_element(By.CLASS_NAME, "match-header__bo").text
         market_map_num = int(market_map_num.lower().replace("bo", ""))
         if market_map_num == 1:
             market_elements = [
