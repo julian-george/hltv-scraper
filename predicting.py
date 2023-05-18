@@ -94,6 +94,14 @@ if len(sys.argv) == 2 and sys.argv[1] == "all":
         print(title)
         for map_name, odds in pred.items():
             print("\t", map_name, odds)
+elif len(sys.argv) == 3:
+    prediction = predict_match(sys.argv[1], sys.argv[2])
+    if prediction[1] == None:
+        print("No such match found")
+    else:
+        print(sys.argv[1], "vs.", sys.argv[2])
+        for map_name, odds in prediction[0].items():
+            print("\t", map_name, odds)
 
 
 def confirm_bet(matchId, map_num):

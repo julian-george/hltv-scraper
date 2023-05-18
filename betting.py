@@ -29,6 +29,7 @@ options.add_argument(f"--profile-directory={os.environ['CHROME_PROFILE']}")
 options.add_argument("--disable-dev-shm-usage")
 options.add_argument("--disable-infobars")
 options.add_argument("--disable-extensions")
+options.add_argument("--start-fullscreen")
 
 
 def login(browser):
@@ -56,19 +57,33 @@ def make_bets():
     now = datetime.now()
     current_year = str(datetime.now().year)
     sleep(0.5)
-    browser.implicitly_wait(10)
+
+    match_sections = list(
+        WebDriverWait(browser, 10).until(
+            EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.match-group"))
+        )
+    )
+
     total_balance = float(
         browser.find_element(By.CSS_SELECTOR, "div.wallet-select__value>span").text
     )
 
     print("Balance: $" + str(total_balance))
 
-    match_urls = list(
-        map(
-            lambda link: link.get_attribute("href"),
-            browser.find_elements(By.CSS_SELECTOR, "a.match-row__total-markets"),
-        )
-    )
+    match_urls = []
+
+    for match_section in match_sections:
+        title = match_section.find_element(By.CLASS_NAME, "match-group-title").text
+        if title != "Featured":
+            match_urls += list(
+                map(
+                    lambda link: link.get_attribute("href"),
+                    match_section.find_elements(
+                        By.CSS_SELECTOR, "a.match-row__total-markets"
+                    ),
+                )
+            )
+
     match_urls = [url for url in match_urls if not url in urls_to_skip]
 
     for bet_url in match_urls:
@@ -90,8 +105,6 @@ def make_bets():
         except:
             match_date = now
         if match_date - now > prediction_threshold:
-            if bet_url == match_urls[0]:
-                continue
             print("Past threshold, ending until bet at", bet_url)
             if sleep_length == None:
                 sleep_length = (match_date - now).total_seconds() - 600
@@ -138,6 +151,14 @@ def make_bets():
             )
         )
         sleep(0.5)
+        market_map_num = market_element.find_element(
+            By.CLASS_NAME, "match-header__bo"
+        ).text
+        market_map_num = int(market_map_num.lower().replace("bo", ""))
+        if market_map_num == 1:
+            market_elements = [
+                browser.find_element(By.CLASS_NAME, "match-page__match-info-column")
+            ]
         for market_element in market_elements:
             market_title = (
                 WebDriverWait(browser, 10)
@@ -148,9 +169,11 @@ def make_bets():
                 )
                 .text
             )
-            for i in range(1, 4):
-                print(match["betted"])
-                if market_title == f"Map {i} Winner" and not i in match["betted"]:
+
+            for i in range(1, market_map_num + 1):
+                if (
+                    market_map_num != 0 or market_title == f"Map {i} Winner"
+                ) and not i in match["betted"]:
                     home_button = market_element.find_element(
                         By.CSS_SELECTOR, "button.odds-button--home-type"
                     )
@@ -164,6 +187,7 @@ def make_bets():
                             - 1
                         )
                     except:
+                        print("Betting locked...")
                         # in this case, the betting is locked and we haven't yet been able to bet on it, so we set the returned sleep length to this
                         sleep_length = 60
                         continue
