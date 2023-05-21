@@ -341,9 +341,10 @@ def make_bets():
 
 
 while True:
-    sleep_length = 60 * 15
+    sleep_length = 60 * 30
     try:
-        sleep_length = make_bets()
+        # this min makes sure that new betting opportunities are caught if they are added before the next match
+        sleep_length = min(make_bets(), sleep_length)
     except Exception as e:
         sleep_length = 60
         print("Error while betting", e)
