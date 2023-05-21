@@ -48,33 +48,46 @@ bet_timeout = 60 * 10
 
 
 def market_bet(prediction, market_element, bet_browser):
+    print("market bet")
     home_button = market_element.find_element(
         By.CSS_SELECTOR, "button.odds-button--home-type"
     )
-    home_odds = WebDriverWait(bet_browser, bet_timeout).until(
-        EC.presence_of_element_located(
-            (
-                By.CSS_SELECTOR,
-                "button.odds-button--home-type span.odds-button__odds",
+    home_odds = float(
+        WebDriverWait(bet_browser, bet_timeout)
+        .until(
+            EC.presence_of_element_located(
+                (
+                    By.CSS_SELECTOR,
+                    "button.odds-button--home-type span.odds-button__odds",
+                )
             )
         )
+        .text
     )
     away_button = market_element.find_element(
         By.CSS_SELECTOR, "button.odds-button--away-type"
     )
-    away_odds = WebDriverWait(bet_browser, bet_timeout).until(
-        EC.presence_of_element_located(
-            (
-                By.CSS_SELECTOR,
-                "button.odds-button--away-type span.odds-button__odds",
+    away_odds = float(
+        WebDriverWait(bet_browser, bet_timeout)
+        .until(
+            EC.presence_of_element_located(
+                (
+                    By.CSS_SELECTOR,
+                    "button.odds-button--away-type span.odds-button__odds",
+                )
             )
         )
+        .text
+    )
+    total_balance = float(
+        bet_browser.find_element(By.CSS_SELECTOR, "div.wallet-select__value>span").text
     )
     total_odds = home_odds + away_odds
     # counterintuitive, but for example if away odds are 12, we want new home odds to be high, not new away odds
     home_odds = away_odds / total_odds
     away_odds = home_odds / total_odds
     home_win = False
+    print(prediction)
     if prediction[0] >= 0.4 and prediction[0] >= home_odds:
         home_win = True
         home_button.click()
@@ -83,7 +96,6 @@ def market_bet(prediction, market_element, bet_browser):
     else:
         print("No bet made.")
     try:
-        print("Making bet")
         pending_bet_input = WebDriverWait(bet_browser, 30).until(
             EC.presence_of_element_located(
                 (
@@ -100,11 +112,12 @@ def market_bet(prediction, market_element, bet_browser):
             )
             else small_bet_percent
         )
+        amount_to_bet = total_balance * bet_percent
         pending_bet_input.send_keys(amount_to_bet)
         submit_button = bet_browser.find_element(
             By.CLASS_NAME, "bet-slip__floating-button"
         )
-        submit_button.click()
+        # submit_button.click()
         WebDriverWait(bet_browser, 10).until(
             EC.none_of(
                 EC.presence_of_element_located(
@@ -117,7 +130,8 @@ def market_bet(prediction, market_element, bet_browser):
         )
         return True
 
-    except:
+    except Exception as e:
+        print(e)
         close_buttons = bet_browser.find_elements(
             By.CLASS_NAME, "selection-header__close-button"
         )
@@ -126,8 +140,7 @@ def market_bet(prediction, market_element, bet_browser):
         return False
 
 
-def map_bet(predictions_dict, bet_url, match_id):
-    bet_browser = Chrome(service=service, options=options)
+def match_bet(predictions_dict, bet_url, bet_browser=None):
     bet_browser.get(bet_url)
     market_elements = list(
         WebDriverWait(bet_browser, 10).until(
@@ -141,6 +154,7 @@ def map_bet(predictions_dict, bet_url, match_id):
     )
     num_maps = len(predictions_dict.items())
     market_element_dict = {}
+
     if num_maps == 1:
         market_elements.append(
             bet_browser.find_element(By.CLASS_NAME, "match-page__match-info-column")
@@ -151,7 +165,7 @@ def map_bet(predictions_dict, bet_url, match_id):
         try:
             market_title = market_element.find_element(
                 By.CLASS_NAME, "market-accordion__market-name"
-            )
+            ).text
         except:
             pass
         if market_title in predictions_dict.keys():
@@ -161,6 +175,8 @@ def map_bet(predictions_dict, bet_url, match_id):
 
     pool = ThreadPool(processes=num_maps)
 
+    successful_bets = []
+
     for title, element in market_element_dict.items():
         # market_bets.append(
         #     threading.Thread(
@@ -169,25 +185,26 @@ def map_bet(predictions_dict, bet_url, match_id):
         #         daemon=True,
         #     )
         # )
-        market_bets.append(
-            (
-                title,
-                pool.apply_async(
-                    market_bet, (predictions_dict[title], element, bet_browser)
-                ),
-            )
+        # market_bets.append(
+        #     (
+        #         title,
+        #         pool.apply_async(
+        #             market_bet, (predictions_dict[title], element, bet_browser)
+        #         ),
+        #     )
+        # )
+        successful_bets.append(
+            market_bet(predictions_dict[title], element, bet_browser)
         )
 
-    successful_bets = []
-
     # wait for all bet threads to conclude before continuing
-    for bet_thread_tuple in market_bets:
-        bet_title = bet_thread_tuple[0]
-        bet_success = bet_thread_tuple[1].get()
-        if bet_success:
-            successful_bets.append(bet_title)
+    # for bet_thread_tuple in market_bets:
+    #     bet_title = bet_thread_tuple[0]
+    #     bet_success = bet_thread_tuple[1].get()
+    #     if bet_success:
+    #         successful_bets.append(bet_title)
 
-    bet_browser.close()
+    # bet_browser.close()
 
     return successful_bets
 
@@ -300,20 +317,22 @@ def make_bets():
             market_prediction_dict["Match"] = predictions[map_names[0]]
         else:
             for i in range(len(map_names)):
-                market_prediction_dict[f"Map {i+1} winner"] = predictions[map_names[i]]
+                market_prediction_dict[f"Map {i+1} Winner"] = predictions[map_names[i]]
 
         # ensures that already betted markets aren't betted again
         market_prediction_dict = {
             k: v for k, v in market_prediction_dict.items() if not k in match["betted"]
         }
-
-        map_threads.append(
-            map_pool.apply_async(map_bet, (market_prediction_dict, bet_url))
-        )
-
-    for map_thread in map_threads:
-        betted_markets = map_thread.get()
+        print("appending to map thread")
+        # map_threads.append(
+        #     map_pool.apply_async(match_bet, (market_prediction_dict, bet_url)).get()
+        # )
+        betted_markets = match_bet(market_prediction_dict, bet_url, browser)
         confirm_bet(match["hltvId"], betted_markets)
+
+    # for map_thread in map_threads:
+    #     betted_markets = map_thread.get()
+    #     confirm_bet(match["hltvId"], betted_markets)
 
     browser.close()
     return sleep_length
