@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import time
 import os
+import threading
 from datetime import datetime
 from types import SimpleNamespace
 from processing_helper import process_maps
@@ -212,5 +213,6 @@ for i in range(thread_num):
     threading.Thread(
         target=process_maps,
         args=(maps_slice, frame_lock, history_lock, exit_lock, feature_data, i),
+        daemon=True,
     ).start()
     time.sleep(1.5)

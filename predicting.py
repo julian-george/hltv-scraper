@@ -88,21 +88,24 @@ def predict_all_matches():
     return predictions
 
 
-if len(sys.argv) == 2 and sys.argv[1] == "all":
-    all_predictions = predict_all_matches()
-    for title, pred in all_predictions.items():
-        print(title)
-        for map_name, odds in pred.items():
-            print("\t", map_name, odds)
-elif len(sys.argv) == 3:
-    prediction = predict_match(sys.argv[1], sys.argv[2])
-    if prediction[1] == None:
-        print("No such match found")
-    else:
-        print(sys.argv[1], "vs.", sys.argv[2])
-        for map_name, odds in prediction[0].items():
-            print("\t", map_name, odds)
+if __name__ == "__main__":
+    if len(sys.argv) == 1:
+        all_predictions = predict_all_matches()
+        for title, pred in all_predictions.items():
+            print(title)
+            for map_name, odds in pred.items():
+                print("\t", map_name, odds)
+    elif len(sys.argv) == 3:
+        prediction = predict_match(sys.argv[1], sys.argv[2])
+        if prediction[1] == None:
+            print("No such match found")
+        else:
+            print(sys.argv[1], "vs.", sys.argv[2])
+            for map_name, odds in prediction[0].items():
+                print("\t", map_name, odds)
 
 
-def confirm_bet(matchId, map_num):
-    unplayed_matches.update_one({"hltvId": matchId}, {"$push": {"betted": map_num}})
+def confirm_bet(matchId, betted_markets):
+    unplayed_matches.update_one(
+        {"hltvId": matchId}, {"$addToSet": {"betted": betted_markets}}
+    )

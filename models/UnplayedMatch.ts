@@ -23,7 +23,7 @@ export const unplayedMatchSchema = new Schema({
     secondTeam: [Number],
   },
   betted: {
-    type: [Number],
+    type: [String],
     default: [],
   },
 });

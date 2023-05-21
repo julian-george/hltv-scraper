@@ -136,6 +136,7 @@ const parseMap = async (
         };
         if (
           isNaN(statObj.kast) ||
+          // TODO: reexamine ADR, sometimes it's NaN when it's 0, but in this case thats not valid: https://www.hltv.org/stats/matches/mapstatsid/156987/godsent-vs-domination
           isNaN(statObj.adr) ||
           isNaN(statObj.rating)
         ) {

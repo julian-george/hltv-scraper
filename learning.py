@@ -95,7 +95,7 @@ normalization_layer.adapt(X_train)
 
 
 def build_model(hp=None):
-    default_layer_size_diff = 20
+    default_layer_size_diff = 40
     layer_size_diff = (
         hp.Choice("layer_size_diff", [-30, -20, -10, 0, 10, 20, 30])
         if hp
@@ -103,7 +103,7 @@ def build_model(hp=None):
     )
     layer_size = num_features + layer_size_diff
 
-    default_layer_num = 4
+    default_layer_num = 3
     layer_num = (
         hp.Choice("layer_num", [3, 4, 5, 6, 7, 8, 9, 10]) if hp else default_layer_num
     )
@@ -123,14 +123,14 @@ def build_model(hp=None):
     for l_i in range(layer_num - 1):
         layer_list.append(keras.layers.Dense(layer_size, activation_function))
 
-    layer_list.append(keras.layers.Dense(2, activation="softmax"))
+    layer_list.append(keras.layers.Dense(1, activation="sigmoid"))
     model = keras.Sequential(layer_list)
     model.summary()
     opt = keras.optimizers.Adam(learning_rate=0.001)
     model.compile(
         optimizer=opt,
-        loss="sparse_categorical_crossentropy",
-        metrics=[keras.metrics.SparseCategoricalAccuracy(name="acc")],
+        loss="binary_crossentropy",
+        metrics=["accuracy"],
     )
 
     return model
