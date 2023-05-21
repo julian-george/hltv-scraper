@@ -98,7 +98,7 @@ normalization_layer.adapt(X_train)
 
 
 def build_model(hp=None):
-    default_layer_size_diff = 30
+    default_layer_size_diff = 20
     layer_size_diff = (
         hp.Choice("layer_size_diff", [-30, -20, -10, 0, 10, 20, 30])
         if hp
@@ -106,7 +106,7 @@ def build_model(hp=None):
     )
     layer_size = num_features + layer_size_diff
 
-    default_layer_num = 3
+    default_layer_num = 2
     layer_num = (
         hp.Choice("layer_num", [3, 4, 5, 6, 7, 8, 9, 10]) if hp else default_layer_num
     )

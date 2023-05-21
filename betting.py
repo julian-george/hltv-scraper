@@ -48,7 +48,6 @@ bet_timeout = 60 * 10
 
 
 def market_bet(prediction, market_element, bet_browser):
-    print("market bet")
     home_button = market_element.find_element(
         By.CSS_SELECTOR, "button.odds-button--home-type"
     )
@@ -82,17 +81,20 @@ def market_bet(prediction, market_element, bet_browser):
     total_balance = float(
         bet_browser.find_element(By.CSS_SELECTOR, "div.wallet-select__value>span").text
     )
+    print("Current Balance: $" + str(total_balance))
+
     total_odds = home_odds + away_odds
     # counterintuitive, but for example if away odds are 12, we want new home odds to be high, not new away odds
     home_odds = away_odds / total_odds
     away_odds = home_odds / total_odds
     home_win = False
-    print(prediction)
     if prediction[0] >= 0.4 and prediction[0] >= home_odds:
         home_win = True
         home_button.click()
+        print(f"Betting - prediction: {prediction[0]}, odds: {home_odds}")
     elif prediction[1] >= 0.4 and prediction[1] >= away_odds:
         away_button.click()
+        print(f"Betting - prediction: {prediction[1]}, odds: {away_odds}")
     else:
         print("No bet made.")
     try:
@@ -131,7 +133,7 @@ def market_bet(prediction, market_element, bet_browser):
         return True
 
     except Exception as e:
-        print(e)
+        print("Error", e)
         close_buttons = bet_browser.find_elements(
             By.CLASS_NAME, "selection-header__close-button"
         )
