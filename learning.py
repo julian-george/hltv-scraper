@@ -1,4 +1,7 @@
 import pickle
+import os
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import traceback
 import numpy as np
 import tensorflow as tf
@@ -95,7 +98,7 @@ normalization_layer.adapt(X_train)
 
 
 def build_model(hp=None):
-    default_layer_size_diff = 40
+    default_layer_size_diff = 30
     layer_size_diff = (
         hp.Choice("layer_size_diff", [-30, -20, -10, 0, 10, 20, 30])
         if hp
@@ -123,14 +126,14 @@ def build_model(hp=None):
     for l_i in range(layer_num - 1):
         layer_list.append(keras.layers.Dense(layer_size, activation_function))
 
-    layer_list.append(keras.layers.Dense(1, activation="sigmoid"))
+    layer_list.append(keras.layers.Dense(2, activation="softmax"))
     model = keras.Sequential(layer_list)
     model.summary()
     opt = keras.optimizers.Adam(learning_rate=0.001)
     model.compile(
         optimizer=opt,
-        loss="binary_crossentropy",
-        metrics=["accuracy"],
+        loss="sparse_categorical_crossentropy",
+        metrics=[keras.metrics.SparseCategoricalAccuracy(name="acc")],
     )
 
     return model

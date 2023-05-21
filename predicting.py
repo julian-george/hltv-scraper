@@ -55,7 +55,9 @@ def generate_prediction(match, same_order=True):
         processed_w = process_frame(pd.DataFrame([w]))[0]
         processed_w = processed_w.to_numpy()
         prediction = list(model.predict(processed_w, verbose=False)[0])
-        map_predictions[map_type] = prediction if same_order else prediction.reverse()
+        if not same_order:
+            prediction.reverse()
+        map_predictions[map_type] = prediction
     return map_predictions
 
 
