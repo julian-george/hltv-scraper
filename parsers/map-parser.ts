@@ -150,8 +150,13 @@ const parseMap = async (
       }
       teamOneStats = {};
       teamTwoStats = {};
-      firstWon ? teamOneStats : (teamTwoStats = firstTeamStats);
-      firstWon ? teamTwoStats : (teamOneStats = secondTeamStats);
+      if (firstWon) {
+        teamOneStats = firstTeamStats;
+        teamTwoStats = secondTeamStats;
+      } else {
+        teamOneStats = secondTeamStats;
+        teamTwoStats = firstTeamStats;
+      }
     }
   }
   const newMap = {

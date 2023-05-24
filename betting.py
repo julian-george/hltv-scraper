@@ -81,7 +81,7 @@ def market_bet(prediction, market_element, bet_browser):
     total_balance = float(
         bet_browser.find_element(By.CSS_SELECTOR, "div.wallet-select__value>span").text
     )
-    print("Current Balance: $" + str(total_balance))
+    print(f"[{str(datetime.now())}] Current Balance: $" + str(total_balance))
 
     total_odds = home_odds + away_odds
     # counterintuitive, but for example if away odds are 12, we want new home odds to be high, not new away odds
@@ -211,10 +211,9 @@ def match_bet(predictions_dict, bet_url, bet_browser=None):
     return successful_bets
 
 
-def make_bets():
+def make_bets(browser=None):
     sleep_length = None
     # options.add_argument("--headless")
-    browser = Chrome(service=service, options=options)
     browser.get("https://thunderpick.io/en/esports/csgo")
     # if this doesn't exist, we aren't signed in
     try:
@@ -232,12 +231,12 @@ def make_bets():
             EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.match-group"))
         )
     )
-
+    sleep(0.5)
     total_balance = float(
         browser.find_element(By.CSS_SELECTOR, "div.wallet-select__value>span").text
     )
 
-    print("Balance: $" + str(total_balance))
+    print(f"[{str(datetime.now())}] Current Balance: $" + str(total_balance))
 
     match_urls = []
 
@@ -325,7 +324,6 @@ def make_bets():
         market_prediction_dict = {
             k: v for k, v in market_prediction_dict.items() if not k in match["betted"]
         }
-        print("appending to map thread")
         # map_threads.append(
         #     map_pool.apply_async(match_bet, (market_prediction_dict, bet_url)).get()
         # )
@@ -336,15 +334,16 @@ def make_bets():
     #     betted_markets = map_thread.get()
     #     confirm_bet(match["hltvId"], betted_markets)
 
-    browser.close()
+    # browser.close()
     return sleep_length
 
 
+browser = Chrome(service=service, options=options)
 while True:
     sleep_length = 60 * 30
     try:
         # this min makes sure that new betting opportunities are caught if they are added before the next match
-        sleep_length = min(make_bets(), sleep_length)
+        sleep_length = min(make_bets(browser), sleep_length)
     except Exception as e:
         sleep_length = 60
         print("Error while betting", e)

@@ -102,7 +102,13 @@ export const scrapeMatches = async ($: CheerioAPI, matchesUrl: string) => {
   for (const section of matchSections) {
     matchLinks = [
       ...matchLinks,
-      ...$(section).find("div.upcomingMatch > a.match").toArray(),
+      ...$(section)
+        .find("div.upcomingMatch > a.match")
+        .toArray()
+        .filter(
+          (matchEle) =>
+            $(matchEle).find("div.matchTeamLogoContainer").length == 2
+        ),
     ];
   }
   for (const matchLink of matchLinks) {

@@ -6,6 +6,7 @@ import traceback
 import numpy as np
 import tensorflow as tf
 import pandas as pd
+import keras_tuner
 from tensorflow import keras
 from sklearn.model_selection import train_test_split
 from learning_helper import process_frame
@@ -98,17 +99,29 @@ normalization_layer.adapt(X_train)
 
 
 def build_model(hp=None):
-    default_layer_size_diff = 20
+    default_layer_size_diff = 30
     layer_size_diff = (
-        hp.Choice("layer_size_diff", [-30, -20, -10, 0, 10, 20, 30])
+        hp.Choice("layer_size_diff", [-30, -20, -10, 0, 10, 20, 30, 40])
         if hp
         else default_layer_size_diff
     )
     layer_size = num_features + layer_size_diff
 
-    default_layer_num = 2
+    default_layer_num = 3
     layer_num = (
-        hp.Choice("layer_num", [3, 4, 5, 6, 7, 8, 9, 10]) if hp else default_layer_num
+        hp.Choice(
+            "layer_num",
+            [
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+            ],
+        )
+        if hp
+        else default_layer_num
     )
 
     default_activation = "relu"
@@ -123,13 +136,29 @@ def build_model(hp=None):
     layer_list.append(normalization_layer)
     layer_list.append(keras.layers.Dense(num_features, activation_function))
 
-    for l_i in range(layer_num - 1):
+    default_first_proportion = 0.6
+    first_proportion = (
+        hp.Choice("first_proportion", [0.3, 0.5, 0.6, 0.75, 0.8, 0.9])
+        if hp
+        else default_first_proportion
+    )
+    layer_list.append(
+        keras.layers.Dense(layer_size * first_proportion, activation_function)
+    )
+
+    for l_i in range(layer_num - 2):
         layer_list.append(keras.layers.Dense(layer_size, activation_function))
 
     layer_list.append(keras.layers.Dense(2, activation="softmax"))
     model = keras.Sequential(layer_list)
     model.summary()
-    opt = keras.optimizers.Adam(learning_rate=0.001)
+    default_learning_rate = 0.0025
+    learning_rate = (
+        hp.Choice("learning_rate", [0.05, 0.01, 0.005, 0.0025, 0.001, 0.0005])
+        if hp
+        else default_learning_rate
+    )
+    opt = keras.optimizers.Adam(learning_rate=learning_rate)
     model.compile(
         optimizer=opt,
         loss="sparse_categorical_crossentropy",
@@ -145,7 +174,7 @@ normalized_X = X_train
 batch_size = 64
 epoch_num = 20
 validation_split = 0.1
-stop_early = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3)
+# stop_early = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3)
 scores = []
 model = None
 for i in range(1):
@@ -156,7 +185,7 @@ for i in range(1):
         batch_size=batch_size,
         validation_split=validation_split,
         epochs=epoch_num,
-        callbacks=[stop_early],
+        callbacks=[tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3)],
     )
     scores.append(model.evaluate(X_test, y_test)[1])
 print(np.mean(scores))
@@ -223,13 +252,14 @@ model.save(model_path)
 #     callbacks=callbacks,
 # )
 
-# tuner = keras_tuner.Hyperband(build_model, objective="loss")
+# tuner = keras_tuner.Hyperband(build_model, objective="val_loss")
 # tuner.search(
 #     X,
 #     y,
 #     epochs=epoch_num,
 #     batch_size=batch_size,
-#     callbacks=[stop_early],
+#     validation_split=validation_split,
+#     callbacks=[tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3)],
 # )
 # best_model = tuner.get_best_models()[0]
 
