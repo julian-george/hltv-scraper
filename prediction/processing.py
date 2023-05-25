@@ -21,99 +21,79 @@ map_history_file_path = "./processed-maps.json"
 # we use this so that the matrix is mutated, not replaced, within threads
 feature_data = SimpleNamespace()
 
-team_prefixes = ["team_one", "team_two"]
-sides = ["ct", "t"]
-
-column_names = [
-    "map_date",
-    "match_num_maps",
-    "event_prize_pool",
-    "online",
-    "event_team_rankings_mean",
-    "event_team_rankings_std",
-    "team_one_ranking",
-    "team_two_ranking",
-]
-
-column_names += [
-    "map_ancient_bool",
-    "map_anubis_bool",
-    "map_cache_bool",
-    "map_cobblestone_bool",
-    "map_dust2_bool",
-    "map_inferno_bool",
-    "map_mirage_bool",
-    "map_nuke_bool",
-    "map_overpass_bool",
-    "map_train_bool",
-    "map_vertigo_bool",
-]
-
-column_names += [f"duel_team_one_{i}_{j}" for j in range(5) for i in range(5)]
-column_names += [f"duel_team_two_{i}_{j}" for j in range(5) for i in range(5)]
-
-stat_types = ["overall", "map", "event"]
-
-for pref in team_prefixes:
-    for type in stat_types:
-        column_names += [
-            f"{pref}_win_num_{type}",
-            f"{pref}_played_num_{type}",
-            f"{pref}_mean_rounds_{type}",
-        ]
-        if type == "event":
-            for side in sides:
-                column_names += [
-                    f"{pref}_player_{i}_{side}_rating_avg_event" for i in range(5)
-                ]
-
-time_ranges = ["short", "medium", "long", "map"]
-
-for time_range in time_ranges:
-    for pref in team_prefixes:
-        for side in sides:
-            column_names += [
-                f"{pref}_player_{i}_{side}_rating_avg_{time_range}" for i in range(5)
-            ]
-            column_names += [
-                f"{pref}_player_{i}_{side}_rating_std_{time_range}" for i in range(5)
-            ]
-        column_names += [
-            f"{pref}_player_{i}_maps_played_{time_range}" for i in range(5)
-        ]
-
-
-detailed_stats = ["kills", "hsKills", "assists", "deaths", "kast", "adr", "fkDiff"]
-
-for pref in team_prefixes:
-    for stat in detailed_stats:
-        for side in sides:
-            column_names += [f"{pref}_player_{i}_{side}_{stat}_avg" for i in range(5)]
-            column_names += [f"{pref}_player_{i}_{side}_{stat}_std" for i in range(5)]
-    column_names += [f"{pref}_player_{i}_maps_played_detailed" for i in range(5)]
-
-
-column_names += [
-    "team_one_win_num_matchup",
-    "teams_played_num_matchup",
-    "team_one_mean_rounds_matchup",
-    "team_two_mean_rounds_matchup",
-]
-
-for pref in team_prefixes:
-    for side in sides:
-        column_names += [
-            f"{pref}_player_{i}_{side}_rating_avg_matchup" for i in range(5)
-        ]
+column_names = []
 
 column_names.append("winner")
-
-for pref in team_prefixes:
-    for side in sides + ["ot"]:
-        column_names.append(f"{pref}_score_{side}")
-
+column_names.append("map_date")
+column_names.append("online_bool")
+column_names.append("event_teamnum")
+column_names.append("event_avg_rankings")
+column_names.append("event_stdev_rankings")
+column_names.append("bestof")
 column_names.append("map_id")
-column_names.append("match_id")
+
+# extremely flawed metric but
+# column_names.append("match_category")
+
+map_list = [
+    "Ancient",
+    "Anubis",
+    "Cache",
+    "Cobblestone",
+    "Dust2",
+    "Inferno",
+    "Mirage",
+    "Nuke",
+    "Overpass",
+    "Train",
+    "Vertigo",
+]
+
+for map in map_list:
+    column_names.append(f"map_{map.lower()}_bool")
+
+
+team_suffixes = ["team_one", "team_two"]
+sides = ["ct", "t"]
+stat_types = ["avg", "stdev"]
+
+round_stats_columns = []
+rating_stats_columns = []
+for suffix in team_suffixes:
+    for side in sides:
+        column_names.append(f"team_avg_ratingvariance_{side}_{suffix}")
+        # probably redundant
+        column_names.append(f"individual_avg_rating_{side}_{suffix}")
+        column_names.append(f"individual_avg_ratingvariance_{side}_{suffix}")
+        column_names.append(f"total_avg_kast_{side}_{suffix}")
+        for type in stat_types:
+            round_stats_columns.append(f"rounds_{type}_{side}_{suffix}")
+            rating_stats_columns.append(f"rating_{type}_{side}_{suffix}")
+    # shared between round stats and rating stats
+    rating_stats_columns.append(f"mapsplayed_avg_{suffix}")
+    column_names.append(f"ranking_{suffix}")
+    column_names.append(f"age_avg_{suffix}")
+    column_names.append(f"total_wonduels_{suffix}")
+    column_names.append(f"timetogether_{suffix}")
+    column_names.append(f"lastwin_{suffix}")
+    column_names.append(f"lastloss_{suffix}")
+    column_names.append(f"total_avg_awpkills_{suffix}")
+    column_names.append(f"total_avg_firstkills_{suffix}")
+
+matchup_category = "matchup"
+
+stat_categories = ["rank", "map", "online", "event", matchup_category]
+
+for category in stat_categories:
+    round_category_columns = [f"{col}_{category}" for col in round_stats_columns]
+    rating_category_columns = [f"{col}_{category}" for col in rating_stats_columns]
+    if category == matchup_category:
+        round_category_columns = [
+            col for col in round_category_columns if not team_suffixes[1] in col
+        ]
+    column_names += round_category_columns
+    column_names += rating_category_columns
+
 
 # feature_data.matrix = np.empty([0, 630])
 feature_data.frame = pd.DataFrame(columns=column_names)
@@ -175,7 +155,7 @@ atexit.register(print_process_rate)
 
 num_maps = maps.count_documents({})
 
-thread_num = 80
+thread_num = 90
 
 slice_size = np.ceil(num_maps / thread_num)
 
@@ -203,16 +183,24 @@ for i in range(thread_num):
                         "as": "event",
                     }
                 },
+                {
+                    "$lookup": {
+                        "from": "players",
+                        "localField": "players",
+                        "foreignField": "hltvId",
+                        "as": "players_info",
+                    }
+                },
                 {"$sort": {"date": -1}},
                 {"$skip": slice_size * i},
                 {"$limit": slice_size},
-            ]
+            ],
+            allowDiskUse=True,
         )
     )
 
     threading.Thread(
         target=process_maps,
         args=(maps_slice, frame_lock, history_lock, exit_lock, feature_data, i),
-        daemon=True,
     ).start()
-    time.sleep(1.5)
+    time.sleep(1)

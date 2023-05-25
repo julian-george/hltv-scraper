@@ -22,7 +22,10 @@ players = db["players"]
 
 month_delta = timedelta(days=1) * 30
 
-team_prefixes = ["team_one", "team_two"]
+max_threshold = 3 * month_delta
+
+
+team_suffixes = ["team_one", "team_two"]
 
 game_sides = ["ct", "t"]
 
@@ -42,594 +45,372 @@ map_list = [
 ]
 
 
+def quantize_timedelta(date):
+    return np.round(date.total_seconds() / 360, 5)
+
+
+def quantize_time(date):
+    return np.round(date.timestamp() / 360000, 5)
+
+
 def get_map_vector(map_name):
     map_dict = {f"map_{name.lower()}_bool": map_name in name for name in map_list}
     return map_dict
 
-
-# amount of time before a map that duel amounts will be accumulated
-duel_map_threshold = 18 * month_delta
 
 # max observed team ranking. keep an eye on match rankings to see if any ever approach this
 #  as of 4/7/23, max observed ranking is 404
 max_ranking = 500
 
 min_date = maps.find({"date": {"$ne": None}}).sort("date").limit(1).next()["date"]
+min_birth_year = (
+    players.find({"birthYear": {"$ne": None}})
+    .sort("birthYear")
+    .limit(1)
+    .next()["birthYear"]
+)
+
+matchup_category = "matchup"
+
+# number of matches in a row a team needs to not play together to be marked as a roster change
+apart_threshold = 6
+
+default_rounds = 6
+default_rating = 0.6
+default_side_stat = 0.4
+default_duel_stat = 0
+default_last = 0
+default_birth_year = 2001
 
 
-# @profile
-def get_duels(team_one_ids, team_two_ids, date, performances):
-    duel_obj = {
-        f"duel_{pref}_{i}_{j}": 0
-        for i in range(5)
-        for j in range(5)
-        for pref in team_prefixes
-    }
-    absolute_duel_threshold = date - duel_map_threshold
-    for performance in performances:
-        if performance["date"] < absolute_duel_threshold:
-            continue
-        player_idx = 0
-        # if non-all duels desired, wrap this in another for loop that goes thru "all", "fk", "awp", etc
-        for player_id in team_one_ids:
-            opponent_idx = 0
-            for opponent_id in team_two_ids:
-                curr_duel_num = 0
-                if player_id in performance["teamOneStats"]:
-                    if (
-                        opponent_id
-                        in performance["teamOneStats"][player_id]["duelMap"]["all"]
-                    ):
-                        curr_duel_num = performance["teamOneStats"][player_id][
-                            "duelMap"
-                        ]["all"][opponent_id]
-                elif player_id in performance["teamTwoStats"]:
-                    if (
-                        opponent_id
-                        in performance["teamTwoStats"][player_id]["duelMap"]["all"]
-                    ):
-                        curr_duel_num = performance["teamTwoStats"][player_id][
-                            "duelMap"
-                        ]["all"][opponent_id]
-                duel_obj[f"duel_team_one_{player_idx}_{opponent_idx}"] += curr_duel_num
-                opponent_idx += 1
-            player_idx += 1
-
-        player_idx = 0
-        for player_id in team_two_ids:
-            opponent_idx = 0
-            for opponent_id in team_one_ids:
-                curr_duel_num = 0
-                if player_id in performance["teamOneStats"]:
-                    if (
-                        opponent_id
-                        in performance["teamOneStats"][player_id]["duelMap"]["all"]
-                    ):
-                        curr_duel_num += performance["teamOneStats"][player_id][
-                            "duelMap"
-                        ]["all"][opponent_id]
-                elif player_id in performance["teamTwoStats"]:
-                    if (
-                        opponent_id
-                        in performance["teamTwoStats"][player_id]["duelMap"]["all"]
-                    ):
-                        curr_duel_num += performance["teamTwoStats"][player_id][
-                            "duelMap"
-                        ]["all"][opponent_id]
-                duel_obj[f"duel_team_two_{player_idx}_{opponent_idx}"] += curr_duel_num
-                opponent_idx += 1
-            player_idx += 1
-
-    return duel_obj
-
-
-# amount of time before a map that rating avg and stdev will be compiled
-
-short_term_threshold = 2 * month_delta
-
-medium_term_threshold = 4 * month_delta
-
-long_term_threshold = 12 * month_delta
-
-map_rating_threshold = 5 * month_delta
-
-
-# @profile
-def get_avg_winrates(
-    team_one_ids,
-    team_two_ids,
-    date,
-    performances,
-    map_name=None,
-    threshold=map_rating_threshold,
-    suffix="overall",
+def generate_round_rating_stats(
+    team_one_ids, team_two_ids, performances, condition_dict, raw_date
 ):
-    # team_one_ratings = [([], []) for i in team_one_ids]
-    team_one_win_num = [0 for i in team_one_ids]
-    team_one_played_num = [0 for i in team_one_ids]
-    team_one_rounds = [[] for i in team_one_ids]
-
-    # team_two_ratings = [([], []) for i in team_two_ids]
-    team_two_win_num = [0 for i in team_two_ids]
-    team_two_played_num = [0 for i in team_two_ids]
-    team_two_rounds = [[] for i in team_two_ids]
-    for performance in performances:
-        if performance["date"] >= date - threshold and (
-            map_name == None or performance["mapType"] == map_name
-        ):
-            player_idx = 0
-            for player_id_one in team_one_ids:
-                score_key = None
-                if player_id_one in performance["teamOneStats"]:
-                    team_one_win_num[player_idx] += 1
-                    team_one_played_num[player_idx] += 1
-                    score_key = "teamOne"
-                elif player_id_one in performance["teamTwoStats"]:
-                    team_one_played_num[player_idx] += 1
-                    score_key = "teamTwo"
-                if score_key:
-                    team_one_rounds[player_idx].append(
-                        performance["score"][score_key]["ct"]
-                        + performance["score"][score_key]["t"]
-                    )
-                # stats_key = score_key + "Stats"
-                # stats_obj = performance[stats_key][player_id_one]
-                # team_one_ratings[player_idx][0].append(stats_obj["ctStats"]["rating"])
-                # team_one_ratings[player_idx][1].append(stats_obj["tStats"]["rating"])
-                player_idx += 1
-            player_idx = 0
-            for player_id_two in team_two_ids:
-                score_key = None
-                if player_id_two in performance["teamOneStats"]:
-                    team_two_win_num[player_idx] += 1
-                    team_two_played_num[player_idx] += 1
-                    score_key = "teamOne"
-                elif player_id_two in performance["teamTwoStats"]:
-                    team_two_played_num[player_idx] += 1
-                    score_key = "teamTwo"
-                if score_key:
-                    team_two_rounds[player_idx].append(
-                        performance["score"][score_key]["ct"]
-                        + performance["score"][score_key]["t"]
-                    )
-                # stats_key = score_key + "Stats"
-                # stats_obj = performance[stats_key][player_id_two]
-                # team_two_ratings[player_idx][0].append(stats_obj["ctStats"]["rating"])
-                # team_two_ratings[player_idx][1].append(stats_obj["tStats"]["rating"])
-                player_idx += 1
-
-    # team_one_ratings_vector = []
-    # for ratings_tuple in team_one_ratings:
-    #     team_one_ratings_vector.append(
-    #         np.mean(ratings_tuple[0]) if len(ratings_tuple[0]) > 0 else default_rating
-    #     )
-    #     team_one_ratings_vector.append(
-    #         np.mean(ratings_tuple[1]) if len(ratings_tuple[1]) > 0 else default_rating
-    #     )
-
-    # team_two_ratings_vector = []
-    # for ratings_tuple in team_two_ratings:
-    #     team_two_ratings_vector.append(
-    #         np.mean(ratings_tuple[0]) if len(ratings_tuple[0]) > 0 else default_rating
-    #     )
-    #     team_two_ratings_vector.append(
-    #         np.mean(ratings_tuple[1]) if len(ratings_tuple[1]) > 0 else default_rating
-    #     )
-
-    team_one_mean_rounds = [
-        np.mean(player_rounds) if len(player_rounds) > 0 else default_rounds
-        for player_rounds in team_one_rounds
-    ]
-    team_two_mean_rounds = [
-        np.mean(player_rounds) if len(player_rounds) > 0 else default_rounds
-        for player_rounds in team_two_rounds
-    ]
-
-    return {
-        f"team_one_win_num_{suffix}": np.mean(team_one_win_num),
-        f"team_one_played_num_{suffix}": np.mean(team_one_played_num),
-        f"team_one_mean_rounds_{suffix}": np.mean(team_one_mean_rounds),
-        f"team_two_win_num_{suffix}": np.mean(team_two_win_num),
-        f"team_two_played_num_{suffix}": np.mean(team_two_played_num),
-        f"team_two_mean_rounds_{suffix}": np.mean(team_two_mean_rounds),
-    }
-
-
-# added to feature vector if, when calculating mean rating, no rating datapoints were found
-default_rating = 0.5
-
-default_rounds = 4
-
-
-# @profile
-def get_map_stats(
-    team_one_ids,
-    team_two_ids,
-    date,
-    performances,
-    map_name,
-    thresholds=(map_rating_threshold),
-):
-    # multidimensional list with these levels:
-    # (1 + # given ones)x thresholds
-    #   10x players
-    #     2x t side and ct side
-    #       (# applicable performances)x ratings
-    # With 3 thresholds, its a 5x10x2xn list (with each threshold & player having a different n)
-    results = [
-        [[[], []] for x2 in range(len(team_one_ids + team_two_ids))]
-        for x1 in range(len(thresholds) + 1)
-    ]
-
-    num_valid = [
-        [0 for x2 in range(len(team_one_ids + team_two_ids))]
-        for x1 in range(len(thresholds) + 1)
-    ]
-
-    threshold_names = ["short", "medium", "long", "map"]
-
-    absolute_thresholds = tuple(map(lambda thresh: date - thresh, thresholds))
-    map_absolute_threshold = date - map_rating_threshold
-
-    for performance in performances:
-        player_index = 0
-        for player_id in team_one_ids + team_two_ids:
-            ct_rating = None
-            t_rating = None
-            if player_id in performance["teamOneStats"]:
-                ct_rating = performance["teamOneStats"][player_id]["ctStats"]["rating"]
-                t_rating = performance["teamOneStats"][player_id]["tStats"]["rating"]
-            elif player_id in performance["teamTwoStats"]:
-                ct_rating = performance["teamTwoStats"][player_id]["ctStats"]["rating"]
-                t_rating = performance["teamTwoStats"][player_id]["tStats"]["rating"]
-            if not (not ct_rating or not t_rating):
-                if (
-                    performance["date"] <= map_absolute_threshold
-                    and performance["mapType"] == map_name
-                ):
-                    results[0][player_index][0].append(ct_rating)
-                    results[0][player_index][1].append(t_rating)
-                    num_valid[0][player_index] += 1
-                for i in range(len(absolute_thresholds)):
-                    if performance["date"] <= absolute_thresholds[i]:
-                        results[i + 1][player_index][0].append(ct_rating)
-                        results[i + 1][player_index][1].append(t_rating)
-                        num_valid[i + 1][player_index] += 1
-            player_index += 1
-
-    param_obj = {}
-
-    for i in range(len(thresholds) + 1):
-        for p in range(len(team_one_ids + team_two_ids)):
-            pref = team_prefixes[0] if p < 5 else team_prefixes[1]
-            player_idx = p % 5
-            param_obj[
-                f"{pref}_player_{player_idx}_maps_played_{threshold_names[i]}"
-            ] = num_valid[i][p]
-            [ct_ratings, t_ratings] = results[i][p]
-            param_obj[
-                f"{pref}_player_{player_idx}_ct_rating_avg_{threshold_names[i]}"
-            ] = (np.mean(ct_ratings) if len(ct_ratings) > 0 else default_rating)
-            param_obj[
-                f"{pref}_player_{player_idx}_ct_rating_std_{threshold_names[i]}"
-            ] = (np.std(ct_ratings) if len(ct_ratings) > 0 else 0)
-            param_obj[
-                f"{pref}_player_{player_idx}_t_rating_avg_{threshold_names[i]}"
-            ] = (np.mean(t_ratings) if len(t_ratings) > 0 else default_rating)
-            param_obj[
-                f"{pref}_player_{player_idx}_t_rating_std_{threshold_names[i]}"
-            ] = (np.std(t_ratings) if len(t_ratings) > 0 else 0)
-
-    return param_obj
-
-
-detailed_threshold = long_term_threshold
-
-detailed_stats_keys = ["kills", "hsKills", "assists", "deaths", "kast", "adr", "fkDiff"]
-
-
-# @profile
-def get_detailed_stats(team_one_ids, team_two_ids, date, performances):
-    detailed_stats = [[[], []] for x in range(len(team_one_ids + team_two_ids))]
-
-    num_valid = [0 for x in range(len(team_one_ids + team_two_ids))]
-
-    detailed_absolute_threshold = date - detailed_threshold
-    for performance in performances:
-        if performance["date"] < detailed_absolute_threshold:
-            continue
-        player_index = 0
-        for player_id in team_one_ids + team_two_ids:
-            if player_id in performance["teamOneStats"]:
-                detailed_stats[player_index][0].append(
-                    performance["teamOneStats"][player_id]["ctStats"]
-                )
-                detailed_stats[player_index][1].append(
-                    performance["teamOneStats"][player_id]["tStats"]
-                )
-
-            elif player_id in performance["teamTwoStats"]:
-                detailed_stats[player_index][0].append(
-                    performance["teamTwoStats"][player_id]["ctStats"]
-                )
-                detailed_stats[player_index][1].append(
-                    performance["teamTwoStats"][player_id]["tStats"]
-                )
-            num_valid[player_index] += 1
-            player_index += 1
-
-    stats_obj = {}
-    for i in range(len(detailed_stats)):
-        player_stats = detailed_stats[i]
-        player_idx = i % 5
-        pref = team_prefixes[0] if i < 5 else team_prefixes[1]
-        ct_stats = pd.DataFrame(player_stats[0]).to_dict(orient="list")
-        t_stats = pd.DataFrame(player_stats[1]).to_dict(orient="list")
-        ct_stats_analyzed = {
-            k: v
-            for obj in (
-                {
-                    f"{pref}_player_{player_idx}_ct_{stat}_avg": np.mean(
-                        ct_stats.get(stat, 0)
-                    ),
-                    f"{pref}_player_{player_idx}_ct_{stat}_std": np.std(
-                        ct_stats.get(stat, 0)
-                    ),
-                }
-                for stat in detailed_stats_keys
-            )
-            for k, v in obj.items()
+    category_stats_dict = {}
+    individual_stats_dict = {}
+    results_dict = {}
+    sided_stats = ["kast", "rating"]
+    duel_stats = ["awp", "firstKill"]
+    for player_id in team_one_ids + team_two_ids:
+        category_stats_dict[player_id] = {}
+        individual_stats_dict[player_id] = {
+            "wonduels": 0,
         }
-        t_stats_analyzed = {
-            k: v
-            for obj in (
-                {
-                    f"{pref}_player_{player_idx}_t_{stat}_avg": np.mean(
-                        t_stats.get(stat, 0)
-                    ),
-                    f"{pref}_player_{player_idx}_t_{stat}_std": np.std(
-                        t_stats.get(stat, 0)
-                    ),
-                }
-                for stat in detailed_stats_keys
-            )
-            for k, v in obj.items()
-        }
-        stats_obj = (
-            stats_obj
-            | ct_stats_analyzed
-            | t_stats_analyzed
-            | {
-                f"{pref}_player_{player_idx}_maps_played_detailed": num_valid[i],
+        for sided_stat in sided_stats:
+            individual_stats_dict[player_id][sided_stat] = {
+                "ct": [default_side_stat],
+                "t": [default_side_stat],
             }
-        )
-    return stats_obj
+        for duel_stat in duel_stats:
+            individual_stats_dict[player_id][duel_stat] = [default_duel_stat]
 
-
-# @profile
-def get_event_stats(team_one_ids, team_two_ids, event_id, performances):
-    team_one_ratings = [([], []) for i in team_one_ids]
-    team_one_win_num = [0 for i in team_one_ids]
-    team_one_played_num = [0 for i in team_one_ids]
-    team_one_rounds = [[] for i in team_one_ids]
-
-    team_two_ratings = [([], []) for i in team_two_ids]
-    team_two_win_num = [0 for i in team_two_ids]
-    team_two_played_num = [0 for i in team_two_ids]
-    team_two_rounds = [[] for i in team_two_ids]
-
+        for category in condition_dict.keys():
+            category_stats_dict[player_id][category] = {
+                "round": {"ct": [default_rounds], "t": [default_rounds]},
+                "rating": {"ct": [default_rating], "t": [default_rating]},
+            }
+    team_one_apart_maps = 0
+    team_two_apart_maps = 0
+    # add stats to list for each player
     for performance in performances:
-        if performance["match"][0]["eventId"] == event_id:
-            player_idx = 0
-            for player_id_one in team_one_ids:
-                score_key = None
-                if player_id_one in performance["teamOneStats"]:
-                    team_one_win_num[player_idx] += 1
-                    team_one_played_num[player_idx] += 1
-                    score_key = "teamOne"
-                elif player_id_one in performance["teamTwoStats"]:
-                    team_one_played_num[player_idx] += 1
-                    score_key = "teamTwo"
-                if score_key:
-                    team_one_rounds[player_idx].append(
-                        performance["score"][score_key]["ct"]
-                        + performance["score"][score_key]["t"]
-                    )
-                    player_stats = performance[score_key + "Stats"][player_id_one]
-                    team_one_ratings[player_idx][0].append(
-                        player_stats["ctStats"]["rating"]
-                    )
-                    team_one_ratings[player_idx][1].append(
-                        player_stats["tStats"]["rating"]
-                    )
-                player_idx += 1
-            player_idx = 0
-            for player_id_two in team_two_ids:
-                score_key = None
-                if player_id_two in performance["teamOneStats"]:
-                    team_two_win_num[player_idx] += 1
-                    team_two_played_num[player_idx] += 1
-                    score_key = "teamOne"
-                elif player_id_two in performance["teamTwoStats"]:
-                    team_two_played_num[player_idx] += 1
-                    score_key = "teamTwo"
-                if score_key:
-                    team_two_rounds[player_idx].append(
-                        performance["score"][score_key]["ct"]
-                        + performance["score"][score_key]["t"]
-                    )
-                    player_stats = performance[score_key + "Stats"][player_id_two]
-                    team_two_ratings[player_idx][0].append(
-                        player_stats["ctStats"]["rating"]
-                    )
-                    team_two_ratings[player_idx][1].append(
-                        player_stats["tStats"]["rating"]
-                    )
-                player_idx += 1
+        for i, player_id in enumerate(team_one_ids + team_two_ids):
+            team_key = None
+            away_key = None
+            if player_id in performance["teamOneStats"].keys():
+                team_key = "teamOne"
+                away_key = "teamTwo"
+            elif player_id in performance["teamTwoStats"].keys():
+                team_key = "teamTwo"
+                away_key = "teamOne"
+            if team_key != None:
+                home_score = (
+                    performance["score"][team_key]["ct"]
+                    + performance["score"][team_key]["t"]
+                    + performance["score"][team_key]["ot"]
+                )
+                away_score = (
+                    performance["score"][away_key]["ct"]
+                    + performance["score"][away_key]["t"]
+                    + performance["score"][away_key]["ot"]
+                )
+                if player_id in team_one_ids:
+                    if not "timetogether_team_one" in results_dict:
+                        if (
+                            intersection_length(
+                                team_one_ids, performance[f"{team_key}Stats"].keys()
+                            )
+                            != 5
+                        ):
+                            team_one_apart_maps += 1
+                        else:
+                            team_one_apart_maps = 0
+                        if team_one_apart_maps >= apart_threshold:
+                            results_dict["timetogether_team_one"] = quantize_timedelta(
+                                raw_date - performance["date"]
+                            )
+                    if not "lastwin_team_one" in results_dict:
+                        if home_score > away_score:
+                            results_dict["lastwin_team_one"] = quantize_timedelta(
+                                raw_date - performance["date"]
+                            )
+                    if not "lastloss_team_one" in results_dict:
+                        if away_score > home_score:
+                            results_dict["lastloss_team_one"] = quantize_timedelta(
+                                raw_date - performance["date"]
+                            )
+                elif player_id in team_two_ids:
+                    if not "timetogether_team_two" in results_dict:
+                        if (
+                            intersection_length(
+                                team_two_ids, performance[f"{team_key}Stats"].keys()
+                            )
+                            != 5
+                        ):
+                            team_two_apart_maps += 1
+                        else:
+                            team_two_apart_maps = 0
+                        if team_two_apart_maps >= apart_threshold:
+                            results_dict["timetogether_team_two"] = quantize_timedelta(
+                                raw_date - performance["date"]
+                            )
+                    if not "lastwin_team_two" in results_dict:
+                        if home_score > away_score:
+                            results_dict["lastwin_team_two"] = quantize_timedelta(
+                                raw_date - performance["date"]
+                            )
+                    if not "lastloss_team_two" in results_dict:
+                        if away_score > home_score:
+                            results_dict["lastloss_team_two"] = quantize_timedelta(
+                                raw_date - performance["date"]
+                            )
 
-    event_stats_obj = {}
+                for stat in sided_stats:
+                    for side in game_sides:
+                        individual_stats_dict[player_id][stat][side].append(
+                            performance[f"{team_key}Stats"][player_id][f"{side}Stats"][
+                                stat
+                            ]
+                        )
+                for stat in duel_stats:
+                    individual_stats_dict[player_id][stat].append(
+                        np.sum(
+                            list(
+                                performance[f"{team_key}Stats"][player_id]["duelMap"][
+                                    stat
+                                ].values()
+                            )
+                        )
+                    )
+                for opponent_id, wins in performance[f"{team_key}Stats"][player_id][
+                    "duelMap"
+                ]["all"].items():
+                    if (
+                        i <= 4
+                        and opponent_id in team_two_ids
+                        or i > 4
+                        and opponent_id in team_one_ids
+                    ):
+                        individual_stats_dict[player_id]["wonduels"] += wins
+                for category, condition in condition_dict.items():
+                    if condition(performance, player_id):
+                        category_stats_dict[player_id][category]["round"]["ct"].append(
+                            performance["score"][team_key]["ct"]
+                        )
+                        category_stats_dict[player_id][category]["round"]["t"].append(
+                            performance["score"][team_key]["t"]
+                        )
+                        category_stats_dict[player_id][category]["rating"]["ct"].append(
+                            performance[team_key + "Stats"][player_id]["ctStats"][
+                                "rating"
+                            ]
+                        )
+                        category_stats_dict[player_id][category]["rating"]["t"].append(
+                            performance[team_key + "Stats"][player_id]["tStats"][
+                                "rating"
+                            ]
+                        )
+    # get player-wise averages
+    for player_id, player_stats in category_stats_dict.items():
+        team_suffix = "team_one" if player_id in team_one_ids else "team_two"
+        for category, category_stats in player_stats.items():
+            for type, type_stats in category_stats.items():
+                if (
+                    category == matchup_category
+                    and team_suffix == "team_two"
+                    and type == "round"
+                ):
+                    continue
+                for side, side_stats in type_stats.items():
+                    results_key_mean = f"{type}_avg_{side}_{team_suffix}_{category}"
+                    if not results_key_mean in results_dict:
+                        results_dict[results_key_mean] = []
+                    results_dict[results_key_mean].append(np.mean(side_stats))
 
-    for i in range(len(team_one_ratings + team_two_ratings)):
-        rating_tuple = (team_one_ratings + team_two_ratings)[i]
-        player_idx = i % 5
-        pref = team_prefixes[0] if i < 5 else team_prefixes[1]
-        event_stats_obj[f"{pref}_player_{player_idx}_ct_rating_avg_event"] = (
-            np.mean(rating_tuple[0]) if len(rating_tuple[0]) > 0 else default_rating
+                    results_key_stdev = f"{type}_stdev_{side}_{team_suffix}_{category}"
+                    if not results_key_stdev in results_dict:
+                        results_dict[results_key_stdev] = []
+                    results_dict[results_key_stdev].append(np.std(side_stats))
+
+            results_key_mapsplayed = f"mapsplayed_avg_{team_suffix}_{category}"
+            if not results_key_mapsplayed in results_dict:
+                results_dict[results_key_mapsplayed] = []
+            # TODO: test this
+            results_dict[results_key_mapsplayed].append(
+                len(list(type_stats.values())[0])
+            )
+    avg_kasts = {suffix: {"t": [], "ct": []} for suffix in team_suffixes}
+    avg_ratings = {suffix: {"t": [], "ct": []} for suffix in team_suffixes}
+    std_ratings = {suffix: {"t": [], "ct": []} for suffix in team_suffixes}
+    total_wonduels = {suffix: 0 for suffix in team_suffixes}
+    avg_awpkills = {suffix: [] for suffix in team_suffixes}
+    avg_firstkills = {suffix: [] for suffix in team_suffixes}
+
+    for player_id, player_stats in individual_stats_dict.items():
+        team_key = "team_one" if player_id in team_one_ids else "team_two"
+        total_wonduels[team_key] += player_stats["wonduels"]
+        avg_awpkills[team_key].append(np.mean(player_stats["awp"]))
+        avg_firstkills[team_key].append(np.mean(player_stats["firstKill"]))
+        for side in game_sides:
+            avg_kasts[team_key][side].append(np.mean(player_stats["kast"][side]))
+            avg_ratings[team_key][side].append(np.mean(player_stats["rating"][side]))
+            std_ratings[team_key][side].append(np.std(player_stats["rating"][side]))
+
+    # essentially get team wise averages
+    results_dict = {key: np.mean(values) for key, values in results_dict.items()}
+
+    for suffix in team_suffixes:
+        results_dict[f"total_wonduels_{suffix}"] = np.sum(total_wonduels[suffix])
+        results_dict[f"total_avg_awpkills_{suffix}"] = np.sum(avg_awpkills[suffix])
+        results_dict[f"total_avg_firstkills_{suffix}"] = np.sum(avg_firstkills[suffix])
+        if not f"timetogether_{suffix}" in results_dict:
+            results_dict[f"timetogether_{suffix}"] = 0
+        if not f"lastwin_{suffix}" in results_dict:
+            results_dict[f"lastwin_{suffix}"] = default_last
+        if not f"lastloss_{suffix}" in results_dict:
+            results_dict[f"lastloss_{suffix}"] = default_last
+        for side in game_sides:
+            results_dict[f"team_avg_ratingvariance_{side}_{suffix}"] = np.std(
+                avg_ratings[suffix][side]
+            )
+            results_dict[f"individual_avg_rating_{side}_{suffix}"] = np.mean(
+                avg_ratings[suffix][side]
+            )
+            results_dict[f"individual_avg_ratingvariance_{side}_{suffix}"] = np.mean(
+                std_ratings[suffix][side]
+            )
+            results_dict[f"total_avg_kast_{side}_{suffix}"] = np.sum(
+                avg_kasts[suffix][side]
+            )
+
+    return results_dict
+
+
+def map_condition(map_name):
+    return lambda performance, pid: performance["mapType"] == map_name
+
+
+def online_condition(online):
+    return lambda performance, pid: performance["match"][0]["online"] == online
+
+
+def event_condition(event_id):
+    return lambda performance, pid: performance["match"][0]["eventId"] == event_id
+
+
+ranking_threshold = 4
+
+
+def intersection_length(lst1, lst2):
+    return len(list(set(lst1) & set(lst2)))
+
+
+def correct_ranking(home_ranking, away_ranking, relative_ranking_int):
+    if relative_ranking_int == 0:
+        if np.abs(home_ranking - away_ranking) < ranking_threshold:
+            return True
+    elif relative_ranking_int == 1:
+        if home_ranking - away_ranking > ranking_threshold:
+            return True
+    elif relative_ranking_int == -1:
+        if home_ranking - away_ranking < -1 * ranking_threshold:
+            return True
+    return False
+
+
+def rank_condition(team_one_ids, team_one_ranking, team_two_ranking):
+    # 1 if team1 higher than team2, 0 if theyre similar, -1 if team2 higher than team1
+    relative_ranking = 0
+    if team_one_ranking - team_two_ranking > ranking_threshold:
+        relative_ranking = 1
+    elif team_one_ranking - team_two_ranking < -1 * ranking_threshold:
+        relative_ranking = -1
+
+    # returns true if a given performance can be used in either teams history against their opposing team's rank
+    def valid_ranking_performance(performance, pid):
+        home_team_key = None
+        away_team_key = None
+        if pid in performance["teamOneStats"].keys():
+            home_team_key = "teamOne"
+            away_team_key = "teamTwo"
+        elif pid in performance["teamTwoStats"].keys():
+            home_team_key = "teamTwo"
+            away_team_key = "teamOne"
+        else:
+            return False
+        return correct_ranking(
+            performance[f"{home_team_key}Ranking"] or max_ranking,
+            performance[f"{away_team_key}Ranking"] or max_ranking,
+            relative_ranking if pid in team_one_ids else -1 * relative_ranking,
         )
-        event_stats_obj[f"{pref}_player_{player_idx}_t_rating_avg_event"] = (
-            np.mean(rating_tuple[1]) if len(rating_tuple[1]) > 0 else default_rating
-        )
 
-    team_one_mean_rounds = [
-        np.mean(player_rounds) if len(player_rounds) > 0 else default_rounds
-        for player_rounds in team_one_rounds
-    ]
-    team_two_mean_rounds = [
-        np.mean(player_rounds) if len(player_rounds) > 0 else default_rounds
-        for player_rounds in team_two_rounds
-    ]
-
-    event_stats_obj |= {
-        "team_one_mean_rounds_event": np.mean(team_one_mean_rounds),
-        "team_two_mean_rounds_event": np.mean(team_two_mean_rounds),
-    }
-    event_stats_obj |= {
-        "team_one_win_num_event": np.mean(team_one_win_num),
-        "team_two_win_num_event": np.mean(team_two_win_num),
-    }
-    event_stats_obj |= {
-        "team_one_played_num_event": np.mean(team_one_played_num),
-        "team_two_played_num_event": np.mean(team_two_played_num),
-    }
-
-    return event_stats_obj
+    return valid_ranking_performance
 
 
-# @profile
-def get_matchup_stats(
-    team_one_ids, team_two_ids, date, performances, threshold=medium_term_threshold
-):
-    team_one_ratings = [([], []) for i in team_one_ids]
-    team_one_rounds = [[] for i in team_one_ids]
-    team_two_ratings = [([], []) for i in team_two_ids]
-    team_two_rounds = [[] for i in team_two_ids]
-    team_one_win_num = 0
-    matchup_played_num = 0
-    for performance in performances:
-        if performance["date"] >= date - threshold:
-            team_one_one_intersection = len(
-                [id for id in team_one_ids if id in performance["teamOneStats"]]
-            )
-            team_two_two_intersection = len(
-                [id for id in team_two_ids if id in performance["teamTwoStats"]]
-            )
-            team_one_two_intersection = len(
-                [id for id in team_one_ids if id in performance["teamTwoStats"]]
-            )
-            team_two_one_intersection = len(
-                [id for id in team_two_ids if id in performance["teamOneStats"]]
-            )
-            # essentially true if the given team_one is the winner of this performance
-            order_match = (
-                team_one_one_intersection >= 3 and team_two_two_intersection >= 3
-            )
-            if order_match or (
-                team_one_two_intersection >= 3 and team_two_one_intersection >= 3
-            ):
-                if order_match:
-                    team_one_win_num += 1
-                matchup_played_num += 1
-                player_idx = 0
-                for player_id_one in team_one_ids:
-                    score_key = "teamOne" if order_match else "teamTwo"
-                    stats_key = score_key + "Stats"
-                    if player_id_one in performance[stats_key]:
-                        player_stats = performance[stats_key][player_id_one]
-                        team_one_ratings[player_idx][0].append(
-                            player_stats["ctStats"]["rating"]
-                        )
-                        team_one_ratings[player_idx][1].append(
-                            player_stats["tStats"]["rating"]
-                        )
-                        team_one_rounds[player_idx].append(
-                            performance["score"][score_key]["ct"]
-                            + performance["score"][score_key]["t"]
-                        )
-                    player_idx += 1
-                player_idx = 0
-                for player_id_two in team_two_ids:
-                    score_key = "teamTwo" if order_match else "teamOne"
-                    stats_key = score_key + "Stats"
-                    if player_id_two in performance[stats_key]:
-                        player_stats = performance[stats_key][player_id_two]
-                        team_two_ratings[player_idx][0].append(
-                            player_stats["ctStats"]["rating"]
-                        )
-                        team_two_ratings[player_idx][1].append(
-                            player_stats["tStats"]["rating"]
-                        )
-                        team_two_rounds[player_idx].append(
-                            performance["score"][score_key]["ct"]
-                            + performance["score"][score_key]["t"]
-                        )
-                    player_idx += 1
-    matchup_stats_obj = {}
-    for i in range(len(team_one_ratings + team_two_ratings)):
-        rating_tuple = (team_one_ratings + team_two_ratings)[i]
-        player_idx = i % 5
-        pref = team_prefixes[0] if i < 5 else team_prefixes[1]
-        matchup_stats_obj[f"{pref}_player_{player_idx}_ct_rating_avg_matchup"] = (
-            np.mean(rating_tuple[0]) if len(rating_tuple[0]) > 0 else default_rating
-        )
-        matchup_stats_obj[f"{pref}_player_{player_idx}_t_rating_avg_matchup"] = (
-            np.mean(rating_tuple[1]) if len(rating_tuple[1]) > 0 else default_rating
-        )
-
-    team_one_mean_rounds = [
-        np.mean(player_rounds) if len(player_rounds) > 0 else default_rounds
-        for player_rounds in team_one_rounds
-    ]
-    team_two_mean_rounds = [
-        np.mean(player_rounds) if len(player_rounds) > 0 else default_rounds
-        for player_rounds in team_two_rounds
-    ]
-
-    matchup_stats_obj |= {
-        "team_one_mean_rounds_matchup": np.mean(team_one_mean_rounds),
-        "team_two_mean_rounds_matchup": np.mean(team_two_mean_rounds),
-    }
-    matchup_stats_obj["team_one_win_num_matchup"] = team_one_win_num
-    matchup_stats_obj["teams_played_num_matchup"] = matchup_played_num
-    return matchup_stats_obj
+def matchup_condition(team_one_ids, team_two_ids):
+    return lambda performance, pid: (
+        intersection_length(team_one_ids, performance["teamOneStats"].keys()) >= 3
+        and intersection_length(team_two_ids, performance["teamTwoStats"].keys()) >= 3
+    ) or (
+        intersection_length(team_one_ids, performance["teamTwoStats"].keys()) >= 3
+        and intersection_length(team_two_ids, performance["teamOneStats"].keys()) >= 3
+    )
 
 
-def generate_data_point(curr_map, played=True, map_type=None):
-    winner = np.random.randint(2) if played else 1
+def generate_data_point(curr_map, played=True, map_name=None):
     w = {}
     related_match = curr_map["match"][0] if played else None
-    raw_date = related_match["date"] if related_match else curr_map["date"]
-    # datetime rounded to the minute
-    date = np.round((raw_date.timestamp() - min_date.timestamp()) / 360000, 5)
-    # i-0
-    w["map_date"] = date
-    # e.g bo1, bo3, etc
-    format = related_match["numMaps"] if played else curr_map["numMaps"]
-    # i-1
-    w["match_num_maps"] = format
-
     related_event = curr_map["event"][0]
-    # prizepool of event
-    #  possibly too inconsistent to be useful, consider removing
-    prizepool = related_event["prizePool"] or 0
-    # i-2
-    w["event_prize_pool"] = prizepool
-    # if event is online
-    online = int(related_event["online"])
-    # i-3
-    w["online"] = online
-    # number of teams in event
-    team_num = related_event["teamNum"]
-    team_rankings = np.array(
+    winner = np.random.randint(2) if played else 1
+    raw_date = related_match["date"] if related_match else curr_map["date"]
+    w["map_date"] = quantize_time(raw_date)
+    team_one_ids = (
+        [
+            str(pid)
+            for pid in curr_map[
+                "teamOneStats" if winner == 1 else "teamTwoStats"
+            ].keys()
+        ]
+        if played
+        else [str(pid) for pid in curr_map["players"]["firstTeam"]]
+    )
+    team_two_ids = (
+        [
+            str(pid)
+            for pid in curr_map[
+                "teamTwoStats" if winner == 1 else "teamOneStats"
+            ].keys()
+        ]
+        if played
+        else [str(pid) for pid in curr_map["players"]["secondTeam"]]
+    )
+    if len(team_one_ids) != 5 or len(team_two_ids) != 5:
+        return None
+    online = related_match["online"] if played else curr_map["online"]
+    w["online_bool"] = online
+    w["event_teamnum"] = related_event["teamNum"]
+    w["bestof"] = related_match["numMaps"] if played else curr_map["numMaps"]
+    # w["match_category"] = related_match["matchTypeCategory"]
+    event_team_rankings = np.array(
         list(
             map(
                 # normalizes rankings by subtracting them by max observed ranking and turning to 0 if it's null
@@ -639,12 +420,11 @@ def generate_data_point(curr_map, played=True, map_type=None):
         )
     )
     # mean and stdev of team rankings at event
-    team_rankings_analyzed = {
-        "event_team_rankings_mean": np.mean(team_rankings),
-        "event_team_rankings_std": np.std(team_rankings),
+    event_team_rankings_analyzed = {
+        "event_avg_rankings": np.mean(event_team_rankings),
+        "event_stdev_rankings": np.std(event_team_rankings),
     }
-    # i-[4,5]
-    w |= team_rankings_analyzed
+    w |= event_team_rankings_analyzed
 
     ranking_one = (
         max_ranking - curr_map["teamOneRanking"]
@@ -656,33 +436,29 @@ def generate_data_point(curr_map, played=True, map_type=None):
         if curr_map["teamTwoRanking"] != None
         else 0
     )
-    # i-[6,7]
-    w["team_one_ranking"] = ranking_one if winner == 1 else ranking_two
-    w["team_two_ranking"] = ranking_two if winner == 1 else ranking_one
+    w["ranking_team_one"] = ranking_one if winner == 1 else ranking_two
+    w["ranking_team_two"] = ranking_two if winner == 1 else ranking_one
 
-    map_name = curr_map["mapType"] if "mapType" in curr_map else map_type
-    # series of binary params (multi-classifier) denoting which map is being played
-    map_vector = get_map_vector(map_name)
-    # i-[8,18]
-    w |= map_vector
+    team_one_ages = [default_birth_year - min_birth_year]
+    team_two_ages = [default_birth_year - min_birth_year]
 
-    team_one_ids = (
-        list(curr_map["teamOneStats" if winner == 1 else "teamTwoStats"].keys())
+    for player in (
+        curr_map["players_info"]
         if played
-        else [str(pid) for pid in curr_map["players"]["firstTeam"]]
-    )
-    team_two_ids = (
-        list(curr_map["teamTwoStats" if winner == 1 else "teamOneStats"].keys())
-        if played
-        else [str(pid) for pid in curr_map["players"]["secondTeam"]]
-    )
+        else curr_map["players_info_first"] + curr_map["players_info_second"]
+    ):
+        if player["birthYear"] != None:
+            adjusted_birth_year = player["birthYear"] - min_birth_year
+            if str(player["hltvId"]) in team_one_ids:
+                team_one_ages.append(adjusted_birth_year)
+            elif str(player["hltvId"]) in team_two_ids:
+                team_two_ages.append(adjusted_birth_year)
 
-    # skip this map if there were more than 5 players per team playing (ie weird substitution/connectivity stuff).
-    #   the number of those maps is low so it cuts out outliers while also keeping param vector the same length
-    if len(team_one_ids) != 5 or len(team_two_ids) != 5:
-        return None
+    w["age_avg_team_one"] = np.mean(team_one_ages)
+    w["age_avg_team_two"] = np.mean(team_two_ages)
 
-    # this assumes that long_term_threshold is longer than all the others
+    w |= get_map_vector(map_name)
+
     performances = list(
         maps.aggregate(
             [
@@ -706,8 +482,14 @@ def generate_data_point(curr_map, played=True, map_type=None):
                     "$match": {
                         "$and": [
                             {"date": {"$lt": raw_date}},
-                            {"date": {"$gte": raw_date - long_term_threshold}},
-                            {"players": {"$in": team_one_ids + team_two_ids}},
+                            {"date": {"$gte": raw_date - max_threshold}},
+                            {
+                                "players": {
+                                    "$in": [
+                                        int(pid) for pid in team_one_ids + team_two_ids
+                                    ]
+                                }
+                            },
                         ]
                     }
                 },
@@ -716,75 +498,20 @@ def generate_data_point(curr_map, played=True, map_type=None):
         )
     )
 
-    # calculating duel maps for all of them
-    duels = get_duels(team_one_ids, team_two_ids, raw_date, performances)
-    # i-[19,68]
-    w |= duels
-    # i-[69,74]
-    win_rates = get_avg_winrates(
-        team_one_ids,
-        team_two_ids,
-        raw_date,
-        performances,
-        None,
-        short_term_threshold,
-    )
+    condition_dict = {
+        matchup_category: matchup_condition(team_one_ids, team_two_ids),
+        "map": map_condition(map_name),
+        "online": online_condition(online),
+        "event": event_condition(related_event["hltvId"]),
+        "rank": rank_condition(team_one_ids, ranking_one, ranking_two),
+    }
 
-    # i-[75,80]
-    w |= win_rates
-    map_win_rates = get_avg_winrates(
-        team_one_ids,
-        team_two_ids,
-        raw_date,
-        performances,
-        map_name,
-        map_rating_threshold,
-        suffix="map",
+    results_data = generate_round_rating_stats(
+        team_one_ids, team_two_ids, performances, condition_dict, raw_date
     )
-    w |= map_win_rates
-    # big (200-length) array containing mean and stdev of almost all collected stats
-    # within this function and subsequent ones, important to put ct stats before t stats
-    threshold_stats = get_map_stats(
-        team_one_ids,
-        team_two_ids,
-        raw_date,
-        performances,
-        map_name=map_name,
-        thresholds=(
-            short_term_threshold,
-            medium_term_threshold,
-            long_term_threshold,
-        ),
-    )
-    # map: i-[81,130]
-    # short_term: i-[131,180]
-    # medium_term: i-[181,230]
-    # long_term: i-[231,280]
-    w |= threshold_stats
-    detailed_stats = get_detailed_stats(
-        team_one_ids, team_two_ids, raw_date, performances
-    )
-    # i-[281,570]
-    w |= detailed_stats
-    # avg ratings and maps won/played for this event
-    event_stats = get_event_stats(
-        team_one_ids,
-        team_two_ids,
-        related_match["eventId"] if played else curr_map["eventId"],
-        performances,
-    )
+    w |= results_data
 
-    # i-[571,596]
-    w |= event_stats
-
-    # avg player ratings when these teams have played, times team one has won, and times they have played
-    matchup_stats = get_matchup_stats(
-        team_one_ids, team_two_ids, raw_date, performances
-    )
-    # i-[597,620]
-    w |= matchup_stats
-
-    # handles ties
+    w["map_id"] = curr_map["hltvId"]
     if played:
         winner_score = (
             curr_map["score"]["teamOne"]["ct"]
@@ -798,39 +525,20 @@ def generate_data_point(curr_map, played=True, map_type=None):
         )
         if winner_score == loser_score:
             winner = 0.5
-        # i-621
         w["winner"] = winner
 
-        score_sides = ["ct", "t", "ot"]
-        team_keys = ["teamOne", "teamTwo"] if winner == 1 else ["teamTwo", "teamOne"]
-        pref_idx = 0
-        # map scores - to be taken out when needed during training/testing
-        for team_key in team_keys:
-            for side in score_sides:
-                w[f"{team_prefixes[pref_idx]}_score_{side}"] = curr_map["score"][
-                    team_key
-                ][side]
-            pref_idx += 1
-
-    # these are just used for inspecting processed data, so we can find their sources. clipped out during training
-    # i-628
-    w["map_id"] = curr_map["hltvId"]
-    # i-629
-    w["match_id"] = related_match["hltvId"] if related_match else None
     return w
 
 
-# @profile
 def process_maps(
     maps_to_process, frame_lock, history_lock, exit_lock, feature_data, thread_idx
 ):
     local_history = set()
-    w_list = []
     print(f"New map processor started: [{thread_idx}]")
     for map_idx in range(len(maps_to_process)):
         curr_map = maps_to_process[map_idx]
         print(f"[{thread_idx}] Processing map ID:", curr_map["hltvId"])
-        w = generate_data_point(curr_map)
+        w = generate_data_point(curr_map, map_name=curr_map["mapType"])
         # with exit_lock:
         #     if feature_data.to_exit:
         #         return

@@ -24,6 +24,22 @@ aggregate_list = [
             "localField": "eventId",
             "foreignField": "hltvId",
             "as": "event",
+        },
+    },
+    {
+        "$lookup": {
+            "from": "players",
+            "localField": "players.firstTeam",
+            "foreignField": "hltvId",
+            "as": "players_info_first",
+        }
+    },
+    {
+        "$lookup": {
+            "from": "players",
+            "localField": "players.secondTeam",
+            "foreignField": "hltvId",
+            "as": "players_info_second",
         }
     },
     {"$sort": {"date": -1}},
@@ -42,17 +58,28 @@ map_types = [
 
 
 def trim_team_name(team_name):
-    team_name = team_name.replace("Gaming", "").replace("GG", "").replace("Team", "")
-    team_name = re.sub(" +", " ", team_name).strip()
     team_name = team_name.lower()
+    team_name = (
+        team_name.replace("gaming", "")
+        .replace("gg", "")
+        .replace("team", "")
+        .replace("esports", "")
+        .replace("e-sports", "")
+        .replace("the", "")
+    )
+    team_name = re.sub(" +", " ", team_name).strip()
+    team_name = team_name
     return team_name
 
 
 def generate_prediction(match, same_order=True):
     map_predictions = {}
     for map_type in map_types:
-        w = generate_data_point(match, played=False, map_type=map_type)
+        w = generate_data_point(match, played=False, map_name=map_type)
         processed_w = process_frame(pd.DataFrame([w]))[0]
+        # with open("t.txt", "w") as f:
+        #     f.write("\n".join(sorted(list(processed_w.columns))))
+        processed_w.to_csv("test.csv")
         processed_w = processed_w.to_numpy()
         prediction = list(model.predict(processed_w, verbose=False)[0])
         if not same_order:

@@ -50,7 +50,7 @@ const responseHeadersToRemove = [
 
 const BASE_URL = "https://www.hltv.org";
 
-let ips;
+let ips = null;
 
 let availableHeadlessBrowsers: Browser[] = [];
 let availableHeadfulBrowsers: Browser[] = [];
@@ -111,9 +111,16 @@ const addNewBrowser = async (headful: boolean) => {
 
 !CACHED &&
   (async () => {
-    ips = IP_URL
-      ? await (await fetch(IP_URL)).text()
-      : fs.readFileSync("ips.txt", { encoding: "utf8" });
+    if (IP_URL) {
+      try {
+        ips = await (await fetch(IP_URL))?.text();
+      } catch (e) {
+        console.error("Failed to download ips, drawing from text file", e);
+      }
+    }
+    if (!ips) {
+      ips = fs.readFileSync("ips.txt", { encoding: "utf8" });
+    }
     ips = ips.split("\n");
     // Removes the empty last line that these text files often have
     ips = ips.filter((ip: string) => ip != "");

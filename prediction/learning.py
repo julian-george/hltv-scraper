@@ -37,12 +37,17 @@ except:
     try:
         # low_memory=False to get rid of mixed-type warning
         feature_frame = pd.read_csv(frame_file_path, index_col=[0], low_memory=False)
+        feature_frame = feature_frame.reindex(sorted(feature_frame.columns), axis=1)
         feature_frame = feature_frame[(feature_frame[label] != 0.5)]
         print("Feature frame loaded, shape:", feature_frame.shape)
         (feature_frame, y) = process_frame(feature_frame, label)
         # feature_frame.info(verbose=True)
+        print(feature_frame.value_counts("winner"))
+        feature_frame.drop(label, axis=1).to_csv("test2.csv")
+        # with open("f.txt", "w") as f:
+        #     f.write("\n".join(sorted(list(feature_frame.columns))))
         feature_matrix = np.hstack(
-            [feature_frame.drop("winner", axis=1).to_numpy(), np.array([y]).T]
+            [feature_frame.drop(label, axis=1).to_numpy(), np.array([y]).T]
         )
         np.save(matrix_file_path, feature_matrix)
     except Exception as e:
@@ -57,7 +62,8 @@ clfs = []
 X = feature_matrix[:, :-1]
 y = feature_matrix[:, -1]
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.01)
+
 
 # # Split into training and test sets
 # rf_train_pd, rf_test_pd = split_dataset(feature_frame)
@@ -107,7 +113,7 @@ def build_model(hp=None):
     )
     layer_size = num_features + layer_size_diff
 
-    default_layer_num = 3
+    default_layer_num = 5
     layer_num = (
         hp.Choice(
             "layer_num",
@@ -118,25 +124,22 @@ def build_model(hp=None):
                 6,
                 7,
                 8,
+                9,
             ],
         )
         if hp
         else default_layer_num
     )
 
-    default_activation = "relu"
-    activation_function = (
-        hp.Choice("activation", ["relu", "tanh", "selu", "leaky_relu"])
-        if hp
-        else default_activation
-    )
+    activation_function = "relu"
 
     layer_list = []
 
     layer_list.append(normalization_layer)
-    layer_list.append(keras.layers.Dense(num_features, activation_function))
 
-    default_first_proportion = 0.6
+    layer_list.append(keras.layers.Dense(num_features))
+
+    default_first_proportion = 1
     first_proportion = (
         hp.Choice("first_proportion", [0.3, 0.5, 0.6, 0.75, 0.8, 0.9])
         if hp
@@ -152,7 +155,7 @@ def build_model(hp=None):
     layer_list.append(keras.layers.Dense(2, activation="softmax"))
     model = keras.Sequential(layer_list)
     model.summary()
-    default_learning_rate = 0.0025
+    default_learning_rate = 0.001
     learning_rate = (
         hp.Choice("learning_rate", [0.05, 0.01, 0.005, 0.0025, 0.001, 0.0005])
         if hp
@@ -171,12 +174,13 @@ def build_model(hp=None):
 # normalized_X = normalization_layer(X_train)
 normalized_X = X_train
 
-batch_size = 64
-epoch_num = 20
-validation_split = 0.1
+batch_size = 12
+epoch_num = 50
+validation_split = 0.15
 # stop_early = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3)
 scores = []
 model = None
+csv_logger = tf.keras.callbacks.CSVLogger("metrics.csv")
 for i in range(1):
     model = build_model()
     history = model.fit(
@@ -185,7 +189,10 @@ for i in range(1):
         batch_size=batch_size,
         validation_split=validation_split,
         epochs=epoch_num,
-        callbacks=[tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3)],
+        callbacks=[
+            tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3),
+            tf.keras.callbacks.CSVLogger("metrics.csv"),
+        ],
     )
     scores.append(model.evaluate(X_test, y_test)[1])
 print(np.mean(scores))
