@@ -57,11 +57,21 @@ const parseMap = async (
     score["teamTwo"] = secondTeam;
     teamOneRanking = rankings.firstTeam;
     teamTwoRanking = rankings.secondTeam;
+    if (pickedBy == "firstTeam") {
+      pickedBy = "teamOne";
+    } else if (pickedBy == "secondTeam") {
+      pickedBy = "teamTwo";
+    }
   } else {
     score["teamOne"] = secondTeam;
     score["teamTwo"] = firstTeam;
     teamOneRanking = rankings.secondTeam;
     teamTwoRanking = rankings.firstTeam;
+    if (pickedBy == "firstTeam") {
+      pickedBy = "teamTwo";
+    } else if (pickedBy == "secondTeam") {
+      pickedBy = "teamOne";
+    }
   }
   const mapPerformanceLink = $(
     ".stats-top-menu-item-link:contains('Performance')"

@@ -4,7 +4,8 @@
   "results": {
     "offset": 0,
     "finishUponDuplicate": false,
-    "traverseAdded": false
+    "traverseAdded": false,
+    "overwriteMatches": true
   },
   "unplayedMatches": {
     "daysToScrape": 3,

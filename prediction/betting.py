@@ -185,7 +185,7 @@ def match_bet(predictions_dict, bet_url, num_maps, bet_browser=None):
                     )
                 )
             )
-            print("market elements", market_elements)
+            # print("market elements", market_elements)
         except Exception:
             print("No market elements")
             # return {}
@@ -352,7 +352,7 @@ def make_bets(browser=None):
             print("All maps betted for", home_team, away_team)
             urls_to_skip.append(bet_url)
             continue
-        map_names = [map_name for map_name in match["mapNames"] if map_name != "TBA"]
+        map_names = [map_name for map_name in match["mapNames"]]
         if len(map_names) == 0:
             browser.get("https://www.hltv.org" + match["matchUrl"])
             map_names = list(
@@ -363,9 +363,11 @@ def make_bets(browser=None):
                     ),
                 ),
             )
-            map_names = [map_name for map_name in map_names if map_name != "TBA"]
 
-            set_maps(match["hltvId"], map_names)
+            set_maps(
+                match["hltvId"],
+                [map_name for map_name in map_names if map_name != "TBA"],
+            )
 
         market_prediction_dict = {}
         if "TBA" in map_names:
@@ -376,10 +378,11 @@ def make_bets(browser=None):
             market_prediction_dict["Match"] = predictions[map_names[0]]
         else:
             for i in range(len(map_names)):
+                market_name = f"Map {i+1} Winner"
+                if map_names[i] == "Default":
+                    confirm_bet(match["hltvId"], {market_name: True})
                 if map_names[i] in predictions:
-                    market_prediction_dict[f"Map {i+1} Winner"] = predictions[
-                        map_names[i]
-                    ]
+                    market_prediction_dict[market_name] = predictions[map_names[i]]
 
         # ensures that already betted markets aren't betted again
         market_prediction_dict = {

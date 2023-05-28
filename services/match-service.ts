@@ -8,5 +8,7 @@ export const getMatchByHltvId = async (id: number) => {
 };
 
 export const createMatch = async (match) => {
-  return await insertWrapper(() => new Match(match).save());
+  return await queryWrapper(() =>
+    Match.findOneAndUpdate({ hltvId: match.hltvId }, match, { upsert: true })
+  );
 };

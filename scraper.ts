@@ -14,6 +14,9 @@ const FINISH_UPON_DUPLICATE = config.get("results.finishUponDuplicate");
 // If true, traverses already added matches to get any submodels that could have had errors
 const TRAVERSE_ADDED_MATCHES = config.get("results.traverseAdded");
 
+// If true, rescrapes match pages and updates DB accordingly
+const OVERWRITE_RESULTS_MATCHES = config.get("results.overwriteMatches");
+
 // Practically deprecated, maybe useful for testing
 const RESULT_LIMIT = Infinity;
 
@@ -28,9 +31,14 @@ export const scrapeResults = async ($: CheerioAPI, resultsUrl: string) => {
     const resultUrl = resultLink.attribs["href"];
     const matchId = Number(resultUrl.split("/")[2]);
     const match = await getMatchByHltvId(matchId);
-    if (!CACHED && match && !TRAVERSE_ADDED_MATCHES) {
+    if (
+      !CACHED &&
+      match &&
+      !TRAVERSE_ADDED_MATCHES &&
+      !OVERWRITE_RESULTS_MATCHES
+    ) {
       if (FINISH_UPON_DUPLICATE) {
-        console.log("Match ID " + matchId + " already in database, aborting.");
+        console.log("Match ID " + matchId + " already in database, finishing.");
         finished = true;
       }
       console.log("Match ID " + matchId + " already in database, skipping.");
@@ -90,7 +98,7 @@ export const scrapeResults = async ($: CheerioAPI, resultsUrl: string) => {
 
 // This determines how many days in the future (including today) that matches will be pulled from. undefined for no limit
 const DAYS_TO_SCRAPE = config.get("unplayedMatches.daysToScrape");
-const OVERWRITE_MATCHES = config.get("unplayedMatches.overwrite");
+const OVERWRITE_UNPLAYED_MATCHES = config.get("unplayedMatches.overwrite");
 
 export const scrapeMatches = async ($: CheerioAPI, matchesUrl: string) => {
   const matchExecutors: (() => Promise<boolean>)[] = [];
@@ -114,7 +122,7 @@ export const scrapeMatches = async ($: CheerioAPI, matchesUrl: string) => {
   for (const matchLink of matchLinks) {
     const matchUrl = matchLink.attribs["href"];
     const matchId = Number(matchUrl.split("/")[2]);
-    if (!OVERWRITE_MATCHES) {
+    if (!OVERWRITE_UNPLAYED_MATCHES) {
       const match = await getUnplayedMatchByHltvId(matchId);
       if (match) {
         console.log(

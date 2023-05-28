@@ -160,15 +160,22 @@ export const parseMatch = async (
       ) || null,
   };
   const picks = {};
+  // this stuff would ordinarily be handled by map parser but due to desire to not rescrape maps, we are doing it here
   $("div.mapholder > div.results").each((i, mapResultContainer) => {
     let teamPick = null;
     if ($(mapResultContainer).find(".results-left.pick").length > 0) {
-      teamPick = "firstTeam";
+      teamPick =
+        $(mapResultContainer).find(".results-left.won").length > 0
+          ? "teamOne"
+          : "teamTwo";
     } else if ($(mapResultContainer).find(".results-right.pick").length > 0) {
-      teamPick = "secondTeam";
+      teamPick =
+        $(mapResultContainer).find(".results-right.won").length > 0
+          ? "teamOne"
+          : "teamTwo";
     }
     const mapLink = $(mapResultContainer).find("a.results-stats");
-    const mapUrl = mapLink.attr("href").toString();
+    const mapUrl = mapLink.attr("href");
     if (mapUrl) {
       const mapId = Number(mapUrl.split("/")[4]);
       picks[mapId] = teamPick;

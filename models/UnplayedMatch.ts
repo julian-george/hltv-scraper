@@ -32,7 +32,7 @@ export const unplayedMatchSchema = new Schema({
   },
   pickedBy: {
     type: String,
-    enum: ["firstTeam", "secondTeam", null],
+    enum: ["teamOne", "teamTwo", null],
     default: null,
   },
 });
