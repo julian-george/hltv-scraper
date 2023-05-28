@@ -1,5 +1,5 @@
 {
-  "scrapeCached": true,
+  "scrapeCached": false,
   "onlyScrapePlayed": false,
   "results": {
     "offset": 0,

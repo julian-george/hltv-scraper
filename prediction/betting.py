@@ -166,10 +166,9 @@ def market_bet(prediction, market_element, bet_browser):
         return False
 
 
-def match_bet(predictions_dict, bet_url, bet_browser=None):
+def match_bet(predictions_dict, bet_url, num_maps, bet_browser=None):
     bet_browser.get(bet_url)
     market_elements = []
-    num_maps = len(predictions_dict.items())
     if num_maps == 1:
         market_elements.append(
             bet_browser.find_element(By.CLASS_NAME, "match-page__match-info-column")
@@ -191,7 +190,6 @@ def match_bet(predictions_dict, bet_url, bet_browser=None):
             print("No market elements")
             # return {}
     market_element_dict = {}
-    print(market_element_dict)
     for market_element in market_elements:
         market_title = "Match"
         try:
@@ -392,7 +390,9 @@ def make_bets(browser=None):
         # map_threads.append(
         #     map_pool.apply_async(match_bet, (market_prediction_dict, bet_url)).get()
         # )
-        betted_markets = match_bet(market_prediction_dict, bet_url, browser)
+        betted_markets = match_bet(
+            market_prediction_dict, bet_url, match["numMaps"], browser
+        )
         if False in betted_markets.values():
             sleep_length = 30
         confirm_bet(match["hltvId"], betted_markets)

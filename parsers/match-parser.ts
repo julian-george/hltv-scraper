@@ -160,29 +160,31 @@ export const parseMatch = async (
       ) || null,
   };
   const picks = {};
-  for (const mapResultContainer in $(".results-played").toArray()) {
-    console.log("e");
+  $("div.mapholder > div.results").each((i, mapResultContainer) => {
     let teamPick = null;
-    if ($(mapResultContainer).find(".results-left.pick")) {
+    if ($(mapResultContainer).find(".results-left.pick").length > 0) {
       teamPick = "firstTeam";
-    } else if ($(mapResultContainer).find(".results-right.pick")) {
+    } else if ($(mapResultContainer).find(".results-right.pick").length > 0) {
       teamPick = "secondTeam";
     }
-    const mapLink = $(mapResultContainer).find("a.results-stats")[0];
-    const mapUrl = mapLink.attribs["href"];
-    const mapId = Number(mapUrl.split("/")[4]);
-    picks[mapId] = teamPick;
-  }
+    const mapLink = $(mapResultContainer).find("a.results-stats");
+    const mapUrl = mapLink.attr("href").toString();
+    if (mapUrl) {
+      const mapId = Number(mapUrl.split("/")[4]);
+      picks[mapId] = teamPick;
+    }
+  });
+
   if (played) {
     let mapLinks = $(
       "div.mapholder > div > div.results-center > div.results-center-stats > a"
-    ).toArray();
+    );
     const handleMaps = async (links, referUrl: string): Promise<boolean> => {
       const mapPromises: Promise<boolean>[] = [];
-      for (const mapLink of links) {
+      mapLinks.each((i, mapLink) => {
         mapPromises.push(
           new Promise(async (resolve, reject) => {
-            const mapUrl = mapLink.attribs["href"];
+            const mapUrl = $(mapLink).attr("href");
             const mapId = Number(mapUrl.split("/")[4]);
             const map = await getMapByHltvId(mapId);
             if (!CACHED && map) {
@@ -227,7 +229,8 @@ export const parseMatch = async (
             // resolve(true);
           })
         );
-      }
+      });
+
       return Promise.all(mapPromises)
         .then(() => {
           return true;
@@ -238,11 +241,11 @@ export const parseMatch = async (
     };
     if (mapLinks.length == 0) {
       // fallback method of getting map stats, since some pages' map stats can only be accessed w/ the "Detailed Stats" button
-      const statsLink = $("div.stats-detailed-stats > a")[0];
-      if (statsLink) {
-        const statsUrl = statsLink.attribs["href"];
+      const statsLink = $("div.stats-detailed-stats > a");
+      if (statsLink.length > 0) {
+        const statsUrl = statsLink.attr("href");
         if (statsUrl.includes("mapstatsid")) {
-          mapLinks = [statsLink];
+          mapLinks = statsLink;
         } else {
           const statsExecutor = async () => {
             const statsPage = !CACHED
