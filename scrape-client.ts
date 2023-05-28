@@ -120,6 +120,8 @@ const addNewBrowser = async (headful: boolean) => {
     }
     if (!ips) {
       ips = fs.readFileSync("ips.txt", { encoding: "utf8" });
+    } else {
+      fs.writeFileSync("ips.txt", ips);
     }
     ips = ips.split("\n");
     // Removes the empty last line that these text files often have

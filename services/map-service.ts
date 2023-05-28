@@ -10,3 +10,8 @@ export const getMapByHltvId = async (id: number) => {
 export const createMap = async (map) => {
   return await insertWrapper(() => new Map(map).save());
 };
+
+export const updatePick = async (id, pickedBy: string) => {
+  console.log("updating pick", id, pickedBy);
+  return await queryWrapper(() => Map.updateOne({ hltvId: id }, { pickedBy }));
+};

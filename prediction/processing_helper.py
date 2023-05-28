@@ -81,6 +81,9 @@ default_side_stat = 0.4
 default_duel_stat = 0
 default_last = 0
 default_birth_year = 2001
+default_stdevs = {"round": 2.75, "rating": 0.4}
+default_rating_variance = 0.45
+default_side_winrate = 0.375
 
 
 def generate_round_rating_stats(
@@ -95,6 +98,9 @@ def generate_round_rating_stats(
         category_stats_dict[player_id] = {}
         individual_stats_dict[player_id] = {
             "wonduels": 0,
+            "twinrate": [default_side_winrate],
+            "ctwinrate": [default_side_winrate],
+            "otwinrate": [default_side_winrate],
         }
         for sided_stat in sided_stats:
             individual_stats_dict[player_id][sided_stat] = {
@@ -211,6 +217,22 @@ def generate_round_rating_stats(
                         and opponent_id in team_one_ids
                     ):
                         individual_stats_dict[player_id]["wonduels"] += wins
+                t_winrate = performance["score"][f"{team_key}"]["t"] / (
+                    performance["score"][f"{team_key}"]["t"]
+                    + performance["score"][f"{away_key}"]["ct"]
+                )
+                individual_stats_dict[player_id]["twinrate"].append(t_winrate)
+                ct_winrate = performance["score"][f"{team_key}"]["ct"] / (
+                    performance["score"][f"{team_key}"]["ct"]
+                    + performance["score"][f"{away_key}"]["t"]
+                )
+                individual_stats_dict[player_id]["twinrate"].append(ct_winrate)
+                ot_winrate = performance["score"][f"{team_key}"]["ot"] + 1 / (
+                    performance["score"][f"{team_key}"]["ot"]
+                    + performance["score"][f"{away_key}"]["ot"]
+                    + 1
+                )
+                individual_stats_dict[player_id]["otwinrate"].append(ot_winrate)
                 for category, condition in condition_dict.items():
                     if condition(performance, player_id):
                         category_stats_dict[player_id][category]["round"]["ct"].append(
@@ -249,7 +271,11 @@ def generate_round_rating_stats(
                     results_key_stdev = f"{type}_stdev_{side}_{team_suffix}_{category}"
                     if not results_key_stdev in results_dict:
                         results_dict[results_key_stdev] = []
-                    results_dict[results_key_stdev].append(np.std(side_stats))
+                    results_dict[results_key_stdev].append(
+                        np.std(side_stats)
+                        if len(side_stats) > 2
+                        else default_stdevs[type]
+                    )
 
             results_key_mapsplayed = f"mapsplayed_avg_{team_suffix}_{category}"
             if not results_key_mapsplayed in results_dict:
@@ -264,12 +290,18 @@ def generate_round_rating_stats(
     total_wonduels = {suffix: 0 for suffix in team_suffixes}
     avg_awpkills = {suffix: [] for suffix in team_suffixes}
     avg_firstkills = {suffix: [] for suffix in team_suffixes}
+    avg_twinrate = {suffix: [] for suffix in team_suffixes}
+    avg_ctwinrate = {suffix: [] for suffix in team_suffixes}
+    avg_otwinrate = {suffix: [] for suffix in team_suffixes}
 
     for player_id, player_stats in individual_stats_dict.items():
         team_key = "team_one" if player_id in team_one_ids else "team_two"
         total_wonduels[team_key] += player_stats["wonduels"]
         avg_awpkills[team_key].append(np.mean(player_stats["awp"]))
         avg_firstkills[team_key].append(np.mean(player_stats["firstKill"]))
+        avg_twinrate[team_key].append(np.mean(player_stats["twinrate"]))
+        avg_ctwinrate[team_key].append(np.mean(player_stats["ctwinrate"]))
+        avg_otwinrate[team_key].append(np.mean(player_stats["otwinrate"]))
         for side in game_sides:
             avg_kasts[team_key][side].append(np.mean(player_stats["kast"][side]))
             avg_ratings[team_key][side].append(np.mean(player_stats["rating"][side]))
@@ -282,6 +314,10 @@ def generate_round_rating_stats(
         results_dict[f"total_wonduels_{suffix}"] = np.sum(total_wonduels[suffix])
         results_dict[f"total_avg_awpkills_{suffix}"] = np.sum(avg_awpkills[suffix])
         results_dict[f"total_avg_firstkills_{suffix}"] = np.sum(avg_firstkills[suffix])
+        results_dict[f"total_avg_twinrate_{suffix}"] = np.sum(avg_twinrate[suffix])
+        results_dict[f"total_avg_ctwinrate_{suffix}"] = np.sum(avg_ctwinrate[suffix])
+        results_dict[f"total_avg_otwinrate_{suffix}"] = np.sum(avg_otwinrate[suffix])
+
         if not f"timetogether_{suffix}" in results_dict:
             results_dict[f"timetogether_{suffix}"] = 0
         if not f"lastwin_{suffix}" in results_dict:
@@ -291,6 +327,8 @@ def generate_round_rating_stats(
         for side in game_sides:
             results_dict[f"team_avg_ratingvariance_{side}_{suffix}"] = np.std(
                 avg_ratings[suffix][side]
+                if len(avg_ratings[suffix][side]) > 2
+                else default_rating_variance
             )
             results_dict[f"individual_avg_rating_{side}_{suffix}"] = np.mean(
                 avg_ratings[suffix][side]
@@ -441,6 +479,13 @@ def generate_data_point(curr_map, played=True, map_name=None):
 
     team_one_ages = [default_birth_year - min_birth_year]
     team_two_ages = [default_birth_year - min_birth_year]
+
+    # w["map_pick_team_one"] = curr_map.get("pickedBy", "") == (
+    #     "firstTeam" if winner == 1 else "secondTeam"
+    # )
+    # w["map_pick_team_two"] = curr_map.get("pickedBy", "") == (
+    #     "secondTeam" if winner == 1 else "firstTeam"
+    # )
 
     for player in (
         curr_map["players_info"]

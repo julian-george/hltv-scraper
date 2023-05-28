@@ -1,6 +1,7 @@
 import pymongo
 import os
 import threading
+import traceback
 from multiprocessing.pool import ThreadPool
 from time import sleep
 from datetime import datetime, timedelta
@@ -15,11 +16,11 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.core.utils import ChromeType
 from pyvirtualdisplay import Display
 
-from predicting import predict_match, confirm_bet
+from predicting import predict_match, confirm_bet, set_maps
 
 
 prediction_threshold = timedelta(minutes=10)
-bet_percent = 0.02
+bet_percent = 0.05
 small_bet_percent = 0.01
 
 total_balance = None
@@ -47,58 +48,80 @@ urls_to_skip = []
 bet_timeout = 10
 
 
-def market_bet(prediction, market_element, bet_browser):
-    home_button = market_element.find_element(
-        By.CSS_SELECTOR, "button.odds-button--home-type"
+def close_bets(browser):
+    close_buttons = browser.find_elements(
+        By.CLASS_NAME, "selection-header__close-button"
     )
-    home_odds = float(
-        WebDriverWait(bet_browser, bet_timeout)
-        .until(
-            EC.presence_of_element_located(
-                (
-                    By.CSS_SELECTOR,
-                    "button.odds-button--home-type span.odds-button__odds",
-                )
-            )
-        )
-        .text
-    )
-    away_button = market_element.find_element(
-        By.CSS_SELECTOR, "button.odds-button--away-type"
-    )
-    away_odds = float(
-        WebDriverWait(bet_browser, bet_timeout)
-        .until(
-            EC.presence_of_element_located(
-                (
-                    By.CSS_SELECTOR,
-                    "button.odds-button--away-type span.odds-button__odds",
-                )
-            )
-        )
-        .text
-    )
-    total_balance = float(
-        bet_browser.find_element(By.CSS_SELECTOR, "div.wallet-select__value>span").text
-    )
-    print(f"[{str(datetime.now())}] Current Balance: $" + str(total_balance))
+    for button in close_buttons:
+        button.click()
 
-    total_odds = (home_odds - 1) + (away_odds - 1)
+
+def market_bet(prediction, market_element, bet_browser):
+    page_home_odds = None
+    page_away_odds = None
+    total_balance = None
+    try:
+        home_button = market_element.find_element(
+            By.CSS_SELECTOR, "button.odds-button--home-type"
+        )
+
+        page_home_odds = float(
+            WebDriverWait(bet_browser, bet_timeout)
+            .until(
+                EC.presence_of_element_located(
+                    (
+                        By.CSS_SELECTOR,
+                        "button.odds-button--home-type span.odds-button__odds",
+                    )
+                )
+            )
+            .text
+        )
+        away_button = market_element.find_element(
+            By.CSS_SELECTOR, "button.odds-button--away-type"
+        )
+        page_away_odds = float(
+            WebDriverWait(bet_browser, bet_timeout)
+            .until(
+                EC.presence_of_element_located(
+                    (
+                        By.CSS_SELECTOR,
+                        "button.odds-button--away-type span.odds-button__odds",
+                    )
+                )
+            )
+            .text
+        )
+        total_balance = float(
+            bet_browser.find_element(
+                By.CSS_SELECTOR, "div.wallet-select__value>span"
+            ).text
+        )
+        print(f"[{str(datetime.now())}] Current Balance: $" + str(total_balance))
+    except Exception:
+        print("Market locked")
+        return False
+    print("calculating odds")
+    total_odds = (page_home_odds - 1) + (page_away_odds - 1)
     # counterintuitive, but for example if away odds are 12, we want new home odds to be high, not new away odds
-    print("Unadjusted home/away odds", home_odds, away_odds)
-    print(home_odds, home_odds - 1, total_odds)
-    home_odds = (away_odds - 1) / total_odds
-    away_odds = (home_odds - 1) / total_odds
+
+    home_odds = (page_away_odds - 1) / total_odds
+    away_odds = (page_home_odds - 1) / total_odds
     home_win = False
     if prediction[0] >= 0.4 and prediction[0] >= home_odds:
         home_win = True
         home_button.click()
-        print(f"Betting home - prediction: {prediction[0]}, odds: {home_odds}")
+        print(
+            f"Betting home - prediction: {prediction[0]}, odds: {home_odds}, unadjusted {page_home_odds}"
+        )
     elif prediction[1] >= 0.4 and prediction[1] >= away_odds:
         away_button.click()
-        print(f"Betting away - prediction: {prediction[1]}, odds: {away_odds}")
+        print(
+            f"Betting away - prediction: {prediction[1]}, odds: {away_odds}, unadjusted {page_away_odds}"
+        )
     else:
-        print("No bet made.")
+        print(f"No bet made. Prediction: {prediction}, odds: {[home_odds,away_odds]}")
+        return True
     try:
         pending_bet_input = WebDriverWait(bet_browser, 30).until(
             EC.presence_of_element_located(
@@ -122,7 +145,7 @@ def market_bet(prediction, market_element, bet_browser):
             By.CLASS_NAME, "bet-slip__floating-button"
         )
         submit_button.click()
-        WebDriverWait(bet_browser, 10).until(
+        WebDriverWait(bet_browser, 20).until(
             EC.none_of(
                 EC.presence_of_element_located(
                     (
@@ -132,38 +155,43 @@ def market_bet(prediction, market_element, bet_browser):
                 )
             )
         )
+        close_bets(bet_browser)
+
         return True
 
     except Exception as e:
-        print("Error", e)
-        close_buttons = bet_browser.find_elements(
-            By.CLASS_NAME, "selection-header__close-button"
-        )
-        for button in close_buttons:
-            button.click()
+        print("Error while confirming bet")
+        print(traceback.format_exc())
+        close_bets(bet_browser)
         return False
 
 
 def match_bet(predictions_dict, bet_url, bet_browser=None):
     bet_browser.get(bet_url)
-    market_elements = list(
-        WebDriverWait(bet_browser, 10).until(
-            EC.presence_of_all_elements_located(
-                (
-                    By.CSS_SELECTOR,
-                    "div.infinite-scroll-list > .market-accordion",
-                )
-            )
-        )
-    )
+    market_elements = []
     num_maps = len(predictions_dict.items())
-    market_element_dict = {}
-
     if num_maps == 1:
         market_elements.append(
             bet_browser.find_element(By.CLASS_NAME, "match-page__match-info-column")
         )
-
+    else:
+        try:
+            market_elements = list(
+                WebDriverWait(bet_browser, 10).until(
+                    EC.presence_of_all_elements_located(
+                        (
+                            By.CSS_SELECTOR,
+                            "div.infinite-scroll-list > .market-accordion",
+                        )
+                    )
+                )
+            )
+            print("market elements", market_elements)
+        except Exception:
+            print("No market elements")
+            # return {}
+    market_element_dict = {}
+    print(market_element_dict)
     for market_element in market_elements:
         market_title = "Match"
         try:
@@ -174,10 +202,6 @@ def match_bet(predictions_dict, bet_url, bet_browser=None):
             pass
         if market_title in predictions_dict.keys():
             market_element_dict[market_title] = market_element
-
-    market_bets = []
-
-    pool = ThreadPool(processes=num_maps)
 
     successful_bets = {}
 
@@ -197,6 +221,7 @@ def match_bet(predictions_dict, bet_url, bet_browser=None):
         #         ),
         #     )
         # )
+        print("Betting", title, bet_url)
         successful_bets[title] = market_bet(
             predictions_dict[title], element, bet_browser
         )
@@ -233,9 +258,15 @@ def make_bets(browser=None):
             EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.match-group"))
         )
     )
-    sleep(0.5)
+    sleep(1)
     total_balance = float(
-        browser.find_element(By.CSS_SELECTOR, "div.wallet-select__value>span").text
+        WebDriverWait(browser, 10)
+        .until(
+            EC.presence_of_element_located(
+                (By.CSS_SELECTOR, "div.wallet-select__value>span")
+            )
+        )
+        .text
     )
 
     print(f"[{str(datetime.now())}] Current Balance: $" + str(total_balance))
@@ -243,7 +274,10 @@ def make_bets(browser=None):
     match_urls = []
 
     for match_section in match_sections:
-        title = match_section.find_element(By.CLASS_NAME, "match-group-title").text
+        title_wait = WebDriverWait(browser, 5)
+        title = title_wait.until(
+            lambda _: match_section.find_element(By.CLASS_NAME, "match-group-title")
+        ).text
         if title != "Featured":
             match_urls += list(
                 map(
@@ -303,24 +337,51 @@ def make_bets(browser=None):
         )
         (predictions, match) = predict_match(home_team, away_team)
         # if this match isnt in the database or it has been fully bet on, skip
-        if match == None or len(match["betted"]) == match["numMaps"]:
+        if match == None:
+            print("No match found for", home_team, away_team)
             urls_to_skip.append(bet_url)
             continue
-        browser.get("https://www.hltv.org" + match["matchUrl"])
-        map_names = list(
-            map(
-                lambda map_ele: map_ele.text,
-                browser.find_elements(
-                    By.CSS_SELECTOR, "div.map-name-holder > div.mapname"
+        elif (
+            len(
+                [
+                    map_betted
+                    for map_betted in match["betted"].values()
+                    if map_betted == True
+                ]
+            )
+            == match["numMaps"]
+        ):
+            print("All maps betted for", home_team, away_team)
+            urls_to_skip.append(bet_url)
+            continue
+        map_names = [map_name for map_name in match["mapNames"] if map_name != "TBA"]
+        if len(map_names) == 0:
+            browser.get("https://www.hltv.org" + match["matchUrl"])
+            map_names = list(
+                map(
+                    lambda map_ele: map_ele.text,
+                    browser.find_elements(
+                        By.CSS_SELECTOR, "div.map-name-holder > div.mapname"
+                    ),
                 ),
-            ),
-        )
+            )
+            map_names = [map_name for map_name in map_names if map_name != "TBA"]
+
+            set_maps(match["hltvId"], map_names)
+
         market_prediction_dict = {}
+        if "TBA" in map_names:
+            print("Maps still TBA")
+            sleep_length = 30
+            continue
         if len(map_names) == 1:
             market_prediction_dict["Match"] = predictions[map_names[0]]
         else:
             for i in range(len(map_names)):
-                market_prediction_dict[f"Map {i+1} Winner"] = predictions[map_names[i]]
+                if map_names[i] in predictions:
+                    market_prediction_dict[f"Map {i+1} Winner"] = predictions[
+                        map_names[i]
+                    ]
 
         # ensures that already betted markets aren't betted again
         market_prediction_dict = {
@@ -353,5 +414,6 @@ while True:
     except Exception as e:
         sleep_length = 60
         print("Error while betting", e)
+        print(traceback.format_exc())
     print("Sleeping until", str(datetime.now() + timedelta(seconds=sleep_length)))
     sleep(sleep_length)

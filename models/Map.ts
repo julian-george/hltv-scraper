@@ -62,6 +62,11 @@ export const mapSchema = new Schema({
   teamTwoStats: { type: SchemaTypes.Map, of: playerStatsSchema },
   date: Date,
   players: [Number],
+  pickedBy: {
+    type: String,
+    enum: ["firstTeam", "secondTeam", null],
+    default: null,
+  },
 });
 
 const Map = model("Map", mapSchema);

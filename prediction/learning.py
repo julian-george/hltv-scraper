@@ -7,6 +7,7 @@ import numpy as np
 import tensorflow as tf
 import pandas as pd
 import keras_tuner
+import tensorflow_model_optimization as tfmot
 from tensorflow import keras
 from sklearn.model_selection import train_test_split
 from learning_helper import process_frame
@@ -38,11 +39,11 @@ except:
         # low_memory=False to get rid of mixed-type warning
         feature_frame = pd.read_csv(frame_file_path, index_col=[0], low_memory=False)
         feature_frame = feature_frame.reindex(sorted(feature_frame.columns), axis=1)
-        feature_frame = feature_frame[(feature_frame[label] != 0.5)]
+        feature_frame = feature_frame[(feature_frame[label] != 0.5)].dropna()
         print("Feature frame loaded, shape:", feature_frame.shape)
         (feature_frame, y) = process_frame(feature_frame, label)
+
         # feature_frame.info(verbose=True)
-        print(feature_frame.value_counts("winner"))
         feature_frame.drop(label, axis=1).to_csv("test2.csv")
         # with open("f.txt", "w") as f:
         #     f.write("\n".join(sorted(list(feature_frame.columns))))
@@ -62,7 +63,7 @@ clfs = []
 X = feature_matrix[:, :-1]
 y = feature_matrix[:, -1]
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.01)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.0001)
 
 
 # # Split into training and test sets
@@ -105,27 +106,29 @@ normalization_layer.adapt(X_train)
 
 
 def build_model(hp=None):
-    default_layer_size_diff = 30
-    layer_size_diff = (
-        hp.Choice("layer_size_diff", [-30, -20, -10, 0, 10, 20, 30, 40])
-        if hp
-        else default_layer_size_diff
-    )
+    default_layer_size_diff = 20
+    layer_size_diff = default_layer_size_diff
+    # layer_size_diff = (
+    #     hp.Choice(
+    #         "layer_size_diff",
+    #         [
+    #             -20,
+    #             -10,
+    #             0,
+    #             10,
+    #             20,
+    #         ],
+    #     )
+    #     if hp
+    #     else default_layer_size_diff
+    # )
     layer_size = num_features + layer_size_diff
 
-    default_layer_num = 5
+    default_layer_num = 4
     layer_num = (
         hp.Choice(
             "layer_num",
-            [
-                3,
-                4,
-                5,
-                6,
-                7,
-                8,
-                9,
-            ],
+            [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
         )
         if hp
         else default_layer_num
@@ -137,30 +140,19 @@ def build_model(hp=None):
 
     layer_list.append(normalization_layer)
 
-    layer_list.append(keras.layers.Dense(num_features))
-
-    default_first_proportion = 1
-    first_proportion = (
-        hp.Choice("first_proportion", [0.3, 0.5, 0.6, 0.75, 0.8, 0.9])
-        if hp
-        else default_first_proportion
-    )
-    layer_list.append(
-        keras.layers.Dense(layer_size * first_proportion, activation_function)
-    )
-
-    for l_i in range(layer_num - 2):
+    for l_i in range(layer_num):
         layer_list.append(keras.layers.Dense(layer_size, activation_function))
 
     layer_list.append(keras.layers.Dense(2, activation="softmax"))
     model = keras.Sequential(layer_list)
     model.summary()
-    default_learning_rate = 0.001
-    learning_rate = (
-        hp.Choice("learning_rate", [0.05, 0.01, 0.005, 0.0025, 0.001, 0.0005])
-        if hp
-        else default_learning_rate
-    )
+    default_learning_rate = 0.0001
+    learning_rate = default_learning_rate
+    # learning_rate = (
+    #     hp.Choice("learning_rate", [0.0025, 0.001, 0.0005, 0.0001, 0.00005, 0.00001])
+    #     if hp
+    #     else default_learning_rate
+    # )
     opt = keras.optimizers.Adam(learning_rate=learning_rate)
     model.compile(
         optimizer=opt,
@@ -174,9 +166,9 @@ def build_model(hp=None):
 # normalized_X = normalization_layer(X_train)
 normalized_X = X_train
 
-batch_size = 12
+batch_size = 4
 epoch_num = 50
-validation_split = 0.15
+validation_split = 0.1
 # stop_early = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3)
 scores = []
 model = None
@@ -190,12 +182,12 @@ for i in range(1):
         validation_split=validation_split,
         epochs=epoch_num,
         callbacks=[
-            tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3),
+            tf.keras.callbacks.EarlyStopping(monitor="val_acc", patience=3),
             tf.keras.callbacks.CSVLogger("metrics.csv"),
         ],
     )
-    scores.append(model.evaluate(X_test, y_test)[1])
-print(np.mean(scores))
+    # scores.append(model.evaluate(X_test, y_test)[1])
+# print(np.mean(scores))
 
 print(np.array([X_test[0]]).shape)
 
@@ -269,6 +261,8 @@ model.save(model_path)
 #     callbacks=[tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3)],
 # )
 # best_model = tuner.get_best_models()[0]
+# print("Saving Model")
+# best_model.save(model_path)
 
 
 # scaler = RobustScaler()

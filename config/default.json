@@ -1,9 +1,9 @@
 {
-  "scrapeCached": false,
+  "scrapeCached": true,
   "onlyScrapePlayed": false,
   "results": {
     "offset": 0,
-    "finishUponDuplicate": true,
+    "finishUponDuplicate": false,
     "traverseAdded": false
   },
   "unplayedMatches": {

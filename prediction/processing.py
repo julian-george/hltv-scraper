@@ -67,7 +67,7 @@ for suffix in team_suffixes:
         column_names.append(f"individual_avg_ratingvariance_{side}_{suffix}")
         column_names.append(f"total_avg_kast_{side}_{suffix}")
         for type in stat_types:
-            round_stats_columns.append(f"rounds_{type}_{side}_{suffix}")
+            round_stats_columns.append(f"round_{type}_{side}_{suffix}")
             rating_stats_columns.append(f"rating_{type}_{side}_{suffix}")
     # shared between round stats and rating stats
     rating_stats_columns.append(f"mapsplayed_avg_{suffix}")
@@ -77,8 +77,16 @@ for suffix in team_suffixes:
     column_names.append(f"timetogether_{suffix}")
     column_names.append(f"lastwin_{suffix}")
     column_names.append(f"lastloss_{suffix}")
+
     column_names.append(f"total_avg_awpkills_{suffix}")
     column_names.append(f"total_avg_firstkills_{suffix}")
+
+    column_names.append(f"total_avg_twinrate_{suffix}")
+    column_names.append(f"total_avg_ctwinrate_{suffix}")
+    column_names.append(f"total_avg_otwinrate_{suffix}")
+
+    # column_names.append(f"map_pick_{suffix}")
+
 
 matchup_category = "matchup"
 
@@ -155,7 +163,7 @@ atexit.register(print_process_rate)
 
 num_maps = maps.count_documents({})
 
-thread_num = 90
+thread_num = 8
 
 slice_size = np.ceil(num_maps / thread_num)
 

@@ -58,15 +58,18 @@ map_types = [
 
 
 def trim_team_name(team_name):
-    team_name = team_name.lower()
+    team_name = team_name.replace("GG", "").lower()
     team_name = (
         team_name.replace("gaming", "")
-        .replace("gg", "")
         .replace("team", "")
+        .replace("esport", "")
         .replace("esports", "")
         .replace("e-sports", "")
-        .replace("the", "")
     )
+    split_team_name = team_name.split(" ")
+    if split_team_name[0] == "the":
+        split_team_name.pop(0)
+    team_name = " ".join(split_team_name)
     team_name = re.sub(" +", " ", team_name).strip()
     team_name = team_name
     return team_name
@@ -92,18 +95,22 @@ def predict_match(team_one_name, team_two_name):
     team_one_name = trim_team_name(team_one_name)
     team_two_name = trim_team_name(team_two_name)
     same_order = True
-    match = unplayed_matches.aggregate(
-        aggregate_list + [{"$match": {"title": f"{team_one_name} vs. {team_two_name}"}}]
-    )
-    if not match._has_next():
-        same_order = False
-        match = unplayed_matches.aggregate(
-            aggregate_list
-            + [{"$match": {"title": f"{team_two_name} vs. {team_one_name}"}}]
-        )
+
+    regex_query = {
+        "$match": {
+            "$and": [
+                {"title": {"$regex": team_one_name}},
+                {"title": {"$regex": team_two_name}},
+            ]
+        }
+    }
+    match = unplayed_matches.aggregate([regex_query] + aggregate_list)
+
     if not match._has_next():
         return ({}, None)
     match = match.next()
+    if match["title"].index(team_one_name) > match["title"].index(team_two_name):
+        same_order = False
     map_predictions = generate_prediction(match, same_order)
     return (map_predictions, match)
 
@@ -134,7 +141,13 @@ if __name__ == "__main__":
                 print("\t", map_name, odds)
 
 
+def set_maps(matchId, maps):
+    unplayed_matches.update_one({"hltvId": matchId}, {"$set": {"mapNames": maps}})
+
+
 def confirm_bet(matchId, betted_markets):
+    unplayed_match = unplayed_matches.find_one({"hltvId": matchId})
+    betted_markets = {**unplayed_match["betted"], **betted_markets}
     unplayed_matches.update_one(
-        {"hltvId": matchId}, {"$addToSet": {"betted": betted_markets}}
+        {"hltvId": matchId}, {"$set": {"betted": betted_markets}}
     )

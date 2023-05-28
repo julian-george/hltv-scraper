@@ -3,7 +3,7 @@ import { CheerioAPI, load } from "cheerio";
 import config from "config";
 import { getEventByHltvId } from "../services/event-service.js";
 import { getPlayerByHltvId } from "../services/player-service.js";
-import { getMapByHltvId } from "../services/map-service.js";
+import { getMapByHltvId, updatePick } from "../services/map-service.js";
 import { createMatch, getMatchByHltvId } from "../services/match-service.js";
 import {
   createUnplayedMatch,
@@ -159,6 +159,20 @@ export const parseMatch = async (
           .replace(/[^0-9\.-]+/g, "")
       ) || null,
   };
+  const picks = {};
+  for (const mapResultContainer in $(".results-played").toArray()) {
+    console.log("e");
+    let teamPick = null;
+    if ($(mapResultContainer).find(".results-left.pick")) {
+      teamPick = "firstTeam";
+    } else if ($(mapResultContainer).find(".results-right.pick")) {
+      teamPick = "secondTeam";
+    }
+    const mapLink = $(mapResultContainer).find("a.results-stats")[0];
+    const mapUrl = mapLink.attribs["href"];
+    const mapId = Number(mapUrl.split("/")[4]);
+    picks[mapId] = teamPick;
+  }
   if (played) {
     let mapLinks = $(
       "div.mapholder > div > div.results-center > div.results-center-stats > a"
@@ -175,6 +189,8 @@ export const parseMatch = async (
               console.log(
                 "Map ID " + mapId + " already in database, skipping."
               );
+              // Having this in here for the time being
+              updatePick(mapId, picks[mapId]);
               resolve(true);
               return true;
             }
@@ -187,7 +203,15 @@ export const parseMatch = async (
               });
             }
             if (mapPage)
-              parseMap(load(mapPage), mapId, matchId, rankings, date, mapUrl)
+              parseMap(
+                load(mapPage),
+                mapId,
+                matchId,
+                rankings,
+                date,
+                mapUrl,
+                picks[mapId]
+              )
                 .catch((err) => {
                   console.error(
                     "Error while parsing map ID " +

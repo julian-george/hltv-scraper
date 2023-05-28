@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 # delete_keywords = [
 #     "kills",
@@ -18,7 +19,7 @@ import numpy as np
 #     "_bool",
 # ]
 
-delete_keywords = ["map_id", "map_date"]
+delete_keywords = ["map_id"]
 
 # (adjusted) date rating 1.0 starts applying
 truncation_date = 14.197
@@ -32,6 +33,7 @@ def process_frame(frame, label=None):
     frame = frame * 1
     # orders columns for consistency in matrix
     frame = frame.reindex(sorted(frame.columns), axis=1)
+    # removing non-integer tie values
     # ensuring label is an int so that decision tree viz works
     if label:
         frame = frame.astype({label: "int32"})
@@ -39,8 +41,10 @@ def process_frame(frame, label=None):
     for column_name in frame.columns:
         to_delete = False
         if frame.dtypes[column_name] == object:
+            frame[column_name] = pd.to_numeric(frame[column_name], errors="coerce")
             frame = frame.astype({column_name: bool})
             frame = frame.astype({column_name: "int64"})
+
         if len([x for x in delete_keywords if x in column_name]) != 0:
             # print(column_nae)
             to_delete = True

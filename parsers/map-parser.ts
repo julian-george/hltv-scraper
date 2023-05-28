@@ -12,7 +12,8 @@ const parseMap = async (
   matchId: number,
   rankings: { firstTeam: number | null; secondTeam: number | null },
   date: Date,
-  mapUrl: string
+  mapUrl: string,
+  pickedBy: string
 ) => {
   const hltvId = mapId;
   let mapType = null;
@@ -169,6 +170,7 @@ const parseMap = async (
     teamOneStats,
     teamTwoStats,
     players,
+    pickedBy,
   };
   if (!CACHED) {
     try {

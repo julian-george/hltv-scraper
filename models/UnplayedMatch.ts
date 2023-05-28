@@ -1,4 +1,4 @@
-import { Schema, model } from "mongoose";
+import { Schema, SchemaType, SchemaTypes, model } from "mongoose";
 
 export const unplayedMatchSchema = new Schema({
   hltvId: {
@@ -23,8 +23,17 @@ export const unplayedMatchSchema = new Schema({
     secondTeam: [Number],
   },
   betted: {
+    type: Object,
+    default: {},
+  },
+  mapNames: {
     type: [String],
     default: [],
+  },
+  pickedBy: {
+    type: String,
+    enum: ["firstTeam", "secondTeam", null],
+    default: null,
   },
 });
 
