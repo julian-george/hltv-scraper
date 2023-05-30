@@ -35,6 +35,10 @@ export const unplayedMatchSchema = new Schema({
     enum: ["teamOne", "teamTwo", null],
     default: null,
   },
+  predictions: {
+    type: Object,
+    default: null,
+  },
 });
 
 const UnplayedMatch = model("UnplayedMatch", unplayedMatchSchema);

@@ -12,6 +12,13 @@ export const createMap = async (map) => {
 };
 
 export const updatePick = async (id, pickedBy: string) => {
-  console.log("updating pick", id, pickedBy);
   return await queryWrapper(() => Map.updateOne({ hltvId: id }, { pickedBy }));
+};
+
+export const updateMapNum = async (id, mapNum: number) => {
+  return await queryWrapper(() => Map.updateOne({ hltvId: id }, { mapNum }));
+};
+
+export const ifMapExists = async (query) => {
+  return await queryWrapper(() => Map.findOne(query));
 };

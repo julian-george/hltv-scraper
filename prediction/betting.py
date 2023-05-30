@@ -11,6 +11,7 @@ from selenium.webdriver import Chrome, ChromeOptions
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
+from selenium.common.exceptions import StaleElementReferenceException
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.core.utils import ChromeType
@@ -18,6 +19,8 @@ from pyvirtualdisplay import Display
 
 from predicting import predict_match, confirm_bet, set_maps
 
+
+ignored_exceptions = [StaleElementReferenceException]
 
 prediction_threshold = timedelta(minutes=10)
 bet_percent = 0.05
@@ -41,6 +44,7 @@ def login(browser):
     browser.get("https://thunderpick.io/en/esports?login=true")
     google_ele = browser.find_element(By.CSS_SELECTOR, ".social-btn--google")
     google_ele.click()
+    sleep(2)
 
 
 urls_to_skip = []
@@ -60,37 +64,33 @@ def market_bet(prediction, market_element, bet_browser):
     page_home_odds = None
     page_away_odds = None
     total_balance = None
+    # print(market_element.get_attribute("innerHTML"))
     try:
+        odds_wait = WebDriverWait(
+            browser, bet_timeout, ignored_exceptions=ignored_exceptions
+        )
+
         home_button = market_element.find_element(
             By.CSS_SELECTOR, "button.odds-button--home-type"
         )
 
-        page_home_odds = float(
-            WebDriverWait(bet_browser, bet_timeout)
-            .until(
-                EC.presence_of_element_located(
-                    (
-                        By.CSS_SELECTOR,
-                        "button.odds-button--home-type span.odds-button__odds",
-                    )
-                )
-            )
-            .text
-        )
         away_button = market_element.find_element(
             By.CSS_SELECTOR, "button.odds-button--away-type"
         )
-        page_away_odds = float(
-            WebDriverWait(bet_browser, bet_timeout)
-            .until(
-                EC.presence_of_element_located(
-                    (
-                        By.CSS_SELECTOR,
-                        "button.odds-button--away-type span.odds-button__odds",
-                    )
+
+        page_home_odds = float(
+            odds_wait.until(
+                lambda _: home_button.find_element(
+                    By.CSS_SELECTOR, "span.odds-button__odds"
                 )
-            )
-            .text
+            ).text
+        )
+        page_away_odds = float(
+            odds_wait.until(
+                lambda _: away_button.find_element(
+                    By.CSS_SELECTOR, "span.odds-button__odds"
+                )
+            ).text
         )
         total_balance = float(
             bet_browser.find_element(
@@ -123,7 +123,9 @@ def market_bet(prediction, market_element, bet_browser):
         print(f"No bet made. Prediction: {prediction}, odds: {[home_odds,away_odds]}")
         return True
     try:
-        pending_bet_input = WebDriverWait(bet_browser, 30).until(
+        pending_bet_input = WebDriverWait(
+            bet_browser, 30, ignored_exceptions=ignored_exceptions
+        ).until(
             EC.presence_of_element_located(
                 (
                     By.CSS_SELECTOR,
@@ -145,7 +147,8 @@ def market_bet(prediction, market_element, bet_browser):
             By.CLASS_NAME, "bet-slip__floating-button"
         )
         submit_button.click()
-        WebDriverWait(bet_browser, 20).until(
+        sleep(1)
+        WebDriverWait(bet_browser, 20, ignored_exceptions=ignored_exceptions).until(
             EC.none_of(
                 EC.presence_of_element_located(
                     (
@@ -171,12 +174,16 @@ def match_bet(predictions_dict, bet_url, num_maps, bet_browser=None):
     market_elements = []
     if num_maps == 1:
         market_elements.append(
-            bet_browser.find_element(By.CLASS_NAME, "match-page__match-info-column")
+            WebDriverWait(bet_browser, 10, ignored_exceptions=ignored_exceptions).until(
+                EC.presence_of_element_located((By.CLASS_NAME, "main-market"))
+            )
         )
     else:
         try:
             market_elements = list(
-                WebDriverWait(bet_browser, 10).until(
+                WebDriverWait(
+                    bet_browser, 10, ignored_exceptions=ignored_exceptions
+                ).until(
                     EC.presence_of_all_elements_located(
                         (
                             By.CSS_SELECTOR,
@@ -232,7 +239,7 @@ def match_bet(predictions_dict, bet_url, num_maps, bet_browser=None):
     #         successful_bets.append(bet_title)
 
     # bet_browser.close()
-    print("successful_bets", successful_bets)
+    print("Successful Bets", successful_bets)
     return successful_bets
 
 
@@ -252,13 +259,13 @@ def make_bets(browser=None):
     current_year = str(datetime.now().year)
 
     match_sections = list(
-        WebDriverWait(browser, 10).until(
+        WebDriverWait(browser, 10, ignored_exceptions=ignored_exceptions).until(
             EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.match-group"))
         )
     )
     sleep(1)
     total_balance = float(
-        WebDriverWait(browser, 10)
+        WebDriverWait(browser, 10, ignored_exceptions=ignored_exceptions)
         .until(
             EC.presence_of_element_located(
                 (By.CSS_SELECTOR, "div.wallet-select__value>span")
@@ -272,7 +279,7 @@ def make_bets(browser=None):
     match_urls = []
 
     for match_section in match_sections:
-        title_wait = WebDriverWait(browser, 5)
+        title_wait = WebDriverWait(browser, 10, ignored_exceptions=ignored_exceptions)
         title = title_wait.until(
             lambda _: match_section.find_element(By.CLASS_NAME, "match-group-title")
         ).text
@@ -296,7 +303,7 @@ def make_bets(browser=None):
         match_date = None
         try:
             match_date = (
-                WebDriverWait(browser, 10)
+                WebDriverWait(browser, 10, ignored_exceptions=ignored_exceptions)
                 .until(
                     EC.presence_of_element_located(
                         (By.CLASS_NAME, "match-header__date")
@@ -316,7 +323,7 @@ def make_bets(browser=None):
             # browser.close()
             return sleep_length
         home_team = (
-            WebDriverWait(browser, 10)
+            WebDriverWait(browser, 10, ignored_exceptions=ignored_exceptions)
             .until(
                 EC.presence_of_element_located(
                     (By.CSS_SELECTOR, "div.main-market__home-team")
@@ -325,7 +332,7 @@ def make_bets(browser=None):
             .text
         )
         away_team = (
-            WebDriverWait(browser, 10)
+            WebDriverWait(browser, 10, ignored_exceptions=ignored_exceptions)
             .until(
                 EC.presence_of_element_located(
                     (By.CSS_SELECTOR, "div.main-market__away-team")

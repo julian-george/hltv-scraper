@@ -7,19 +7,38 @@ import numpy as np
 import tensorflow as tf
 import pandas as pd
 import keras_tuner
-import tensorflow_model_optimization as tfmot
+
+# import tensorflow_model_optimization as tfmot
 from tensorflow import keras
 from sklearn.model_selection import train_test_split
 from learning_helper import process_frame
+from predicting import map_ids_to_examine
 
 
 frame_file_path = "saved-frame.csv"
+examine_frame_file_path = "examine-frame.csv"
+examine_ids_file_path = "examine-ids.csv"
 matrix_file_path = "cached-matrix.npy"
 
-feature_matrix = None
 feature_frame = None
+feature_matrix = None
+examine_frame = None
+examine_ids = map_ids_to_examine()
+try:
+    examine_frame = pd.read_csv(
+        examine_frame_file_path,
+        index_col=[0],
+    )
+except:
+    print("Unable to get examine frame")
+try:
+    examine_ids = pd.read_csv(examine_ids_file_path, index_col=[0])
+except:
+    print("Unable to get examine ids")
+examine_matrix = None
 X = None
 y = None
+
 
 label = "winner"
 
@@ -39,9 +58,16 @@ except:
         # low_memory=False to get rid of mixed-type warning
         feature_frame = pd.read_csv(frame_file_path, index_col=[0], low_memory=False)
         feature_frame = feature_frame.reindex(sorted(feature_frame.columns), axis=1)
-        feature_frame = feature_frame[(feature_frame[label] != 0.5)].dropna()
+        examine_frame = feature_frame[feature_frame["map_id"].isin(examine_ids)]
+        examine_ids = examine_frame["map_id"]
+        examine_ids.to_csv(examine_ids_file_path)
+        feature_frame = feature_frame[
+            (feature_frame[label] != 0.5) & ~(feature_frame["map_id"].isin(examine_ids))
+        ].dropna()
         print("Feature frame loaded, shape:", feature_frame.shape)
         (feature_frame, y) = process_frame(feature_frame, label)
+        (examine_frame, examine_y) = process_frame(examine_frame, label)
+        examine_frame.to_csv(examine_frame_file_path)
 
         # feature_frame.info(verbose=True)
         feature_frame.drop(label, axis=1).to_csv("test2.csv")
@@ -157,7 +183,10 @@ def build_model(hp=None):
     model.compile(
         optimizer=opt,
         loss="sparse_categorical_crossentropy",
-        metrics=[keras.metrics.SparseCategoricalAccuracy(name="acc")],
+        metrics=[
+            keras.metrics.SparseCategoricalAccuracy(name="acc"),
+            # keras.metrics.F1Score(),
+        ],
     )
 
     return model
@@ -166,8 +195,8 @@ def build_model(hp=None):
 # normalized_X = normalization_layer(X_train)
 normalized_X = X_train
 
-batch_size = 4
-epoch_num = 50
+batch_size = 24
+epoch_num = 32
 validation_split = 0.1
 # stop_early = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3)
 scores = []
@@ -188,6 +217,11 @@ for i in range(1):
     )
     # scores.append(model.evaluate(X_test, y_test)[1])
 # print(np.mean(scores))
+
+model.evaluate(examine_frame.drop(label, axis=1), examine_frame[label])
+for i, data_point in examine_frame.drop(label, axis=1).iterrows():
+    print(examine_ids["map_id"][i], model.predict(np.array([data_point.to_numpy()])))
+
 
 print(np.array([X_test[0]]).shape)
 

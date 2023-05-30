@@ -6,4 +6,3 @@ pyvirtualdisplay
 numpy
 pandas
 scikit-learn
-dotenv

@@ -3,7 +3,11 @@ import { CheerioAPI, load } from "cheerio";
 import config from "config";
 import { getEventByHltvId } from "../services/event-service.js";
 import { getPlayerByHltvId } from "../services/player-service.js";
-import { getMapByHltvId, updatePick } from "../services/map-service.js";
+import {
+  getMapByHltvId,
+  updatePick,
+  updateMapNum,
+} from "../services/map-service.js";
 import { createMatch, getMatchByHltvId } from "../services/match-service.js";
 import {
   createUnplayedMatch,
@@ -200,6 +204,7 @@ export const parseMatch = async (
               );
               // Having this in here for the time being
               updatePick(mapId, picks[mapId]);
+              updateMapNum(mapId, i);
               resolve(true);
               return true;
             }
@@ -217,9 +222,9 @@ export const parseMatch = async (
                 mapId,
                 matchId,
                 rankings,
-                date,
                 mapUrl,
-                picks[mapId]
+                picks[mapId],
+                i
               )
                 .catch((err) => {
                   console.error(
@@ -304,7 +309,7 @@ export const parseMatch = async (
       const foundMatch = await getMatchByHltvId(hltvId);
       if (foundMatch) return foundMatch;
     }
-    await deleteUnplayedMatchByHltvId(hltvId);
+    // await deleteUnplayedMatchByHltvId(hltvId);
     try {
       return await createMatch({
         hltvId,

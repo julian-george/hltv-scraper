@@ -67,6 +67,7 @@ export const mapSchema = new Schema({
     enum: ["teamOne", "teamTwo", null],
     default: null,
   },
+  mapNum: Number,
 });
 
 const Map = model("Map", mapSchema);

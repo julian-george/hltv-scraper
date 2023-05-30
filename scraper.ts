@@ -5,6 +5,7 @@ import { getMatchByHltvId } from "./services/match-service.js";
 import { getUnplayedMatchByHltvId } from "./services/unplayedmatch-service.js";
 import puppeteerGet from "./scrape-client.js";
 import { parseMatch } from "./parsers/match-parser.js";
+import { ifMapExists } from "./services/map-service.js";
 
 // If true, scrapes cached pages saved in ../cached
 const CACHED = config.get("scrapeCached");
@@ -35,7 +36,13 @@ export const scrapeResults = async ($: CheerioAPI, resultsUrl: string) => {
       !CACHED &&
       match &&
       !TRAVERSE_ADDED_MATCHES &&
-      !OVERWRITE_RESULTS_MATCHES
+      !OVERWRITE_RESULTS_MATCHES &&
+      // Temporary thing as we update with these two new features
+      ifMapExists({
+        matchId,
+        pickedBy: { $exists: true },
+        numMaps: { $exists: true },
+      })
     ) {
       if (FINISH_UPON_DUPLICATE) {
         console.log("Match ID " + matchId + " already in database, finishing.");
