@@ -19,7 +19,7 @@ import pandas as pd
 #     "_bool",
 # ]
 
-delete_keywords = ["map_id"]
+delete_keywords = ["map_id", "map_num", "rating", "stdev", "matchup"]
 
 # (adjusted) date rating 1.0 starts applying
 truncation_date = 14.197
@@ -50,4 +50,10 @@ def process_frame(frame, label=None):
             to_delete = True
         if to_delete:
             frame = frame.drop(column_name, axis=1)
-    return frame, y
+    sample_weights = frame["map_date"]
+    sample_weights = (sample_weights - np.min(sample_weights)) / (
+        np.max(sample_weights) - np.min(sample_weights)
+    )
+    sample_weights = sample_weights * 0.8
+    sample_weights = sample_weights + 0.2
+    return frame, y, sample_weights

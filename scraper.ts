@@ -36,13 +36,13 @@ export const scrapeResults = async ($: CheerioAPI, resultsUrl: string) => {
       !CACHED &&
       match &&
       !TRAVERSE_ADDED_MATCHES &&
-      !OVERWRITE_RESULTS_MATCHES &&
       // Temporary thing as we update with these two new features
-      ifMapExists({
-        matchId,
-        pickedBy: { $exists: true },
-        numMaps: { $exists: true },
-      })
+      (!OVERWRITE_RESULTS_MATCHES ||
+        (await ifMapExists({
+          matchId,
+          pickedBy: { $exists: true },
+          numMaps: { $exists: true },
+        })))
     ) {
       if (FINISH_UPON_DUPLICATE) {
         console.log("Match ID " + matchId + " already in database, finishing.");

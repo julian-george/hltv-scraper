@@ -20,5 +20,6 @@ export const updateMapNum = async (id, mapNum: number) => {
 };
 
 export const ifMapExists = async (query) => {
-  return await queryWrapper(() => Map.findOne(query));
+  const result = !!(await queryWrapper(() => Map.findOne(query)));
+  return result;
 };

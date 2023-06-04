@@ -226,7 +226,7 @@ def generate_round_rating_stats(
                     performance["score"][f"{team_key}"]["ct"]
                     + performance["score"][f"{away_key}"]["t"]
                 )
-                individual_stats_dict[player_id]["twinrate"].append(ct_winrate)
+                individual_stats_dict[player_id]["ctwinrate"].append(ct_winrate)
                 ot_winrate = performance["score"][f"{team_key}"]["ot"] + 1 / (
                     performance["score"][f"{team_key}"]["ot"]
                     + performance["score"][f"{away_key}"]["ot"]
@@ -480,12 +480,14 @@ def generate_data_point(curr_map, played=True, map_name=None):
     team_one_ages = [default_birth_year - min_birth_year]
     team_two_ages = [default_birth_year - min_birth_year]
 
-    # w["map_pick_team_one"] = curr_map.get("pickedBy", "") == (
-    #     "firstTeam" if winner == 1 else "secondTeam"
-    # )
-    # w["map_pick_team_two"] = curr_map.get("pickedBy", "") == (
-    #     "secondTeam" if winner == 1 else "firstTeam"
-    # )
+    w["map_pick_team_one"] = curr_map.get("pickedBy", "") == (
+        "teamOne" if winner == 1 else "teamTwo"
+    )
+    w["map_pick_team_two"] = curr_map.get("pickedBy", "") == (
+        "teamTwo" if winner == 1 else "teamOne"
+    )
+
+    w["map_num"] = curr_map.get("mapNum", 0)
 
     for player in (
         curr_map["players_info"]
@@ -575,35 +577,15 @@ def generate_data_point(curr_map, played=True, map_name=None):
     return w
 
 
-def process_maps(
-    maps_to_process, frame_lock, history_lock, exit_lock, feature_data, thread_idx
-):
-    local_history = set()
+def process_maps(maps_to_process, frame_lock, feature_data, thread_idx):
     print(f"New map processor started: [{thread_idx}]")
     for map_idx in range(len(maps_to_process)):
         curr_map = maps_to_process[map_idx]
         print(f"[{thread_idx}] Processing map ID:", curr_map["hltvId"])
         w = generate_data_point(curr_map, map_name=curr_map["mapType"])
-        # with exit_lock:
-        #     if feature_data.to_exit:
-        #         return
-        # if feature_data.history is None:
-        #     if curr_map["hltvId"] in local_history:
-        #         continue
-        # else:
-        #     with history_lock:
-        #         if curr_map["hltvId"] in feature_data.history:
-        #             continue
-
-        # with exit_lock:
-        #     if feature_data.to_exit:
-        #         return
-
-        if feature_data.history is None:
-            local_history.add(curr_map["hltvId"])
-        else:
-            with history_lock:
-                feature_data.history.add(curr_map["hltvId"])
+        if len(w.keys()) != feature_data.frame.shape[1]:
+            print("Partial datapoint for map id", curr_map["hltvId"])
+            continue
 
         with frame_lock:
             feature_data.frame.loc[len(feature_data.frame.index)] = w

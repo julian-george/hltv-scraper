@@ -2,10 +2,10 @@
   "scrapeCached": false,
   "onlyScrapePlayed": false,
   "results": {
-    "offset": 0,
-    "finishUponDuplicate": true,
+    "offset": 60000,
+    "finishUponDuplicate": false,
     "traverseAdded": false,
-    "overwriteMatches": false
+    "overwriteMatches": true
   },
   "unplayedMatches": {
     "daysToScrape": 3,

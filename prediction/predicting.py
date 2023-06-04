@@ -79,6 +79,26 @@ def trim_team_name(team_name):
     return team_name
 
 
+def get_cached_predictions(matchId, same_order):
+    match = unplayed_matches.find_one({"hltvId": matchId})
+    if not match or "predictions" not in match or match["predictions"] == None:
+        return None
+    map_predictions = match["predictions"]
+    for map_name, predictions in map_predictions.items():
+        if not same_order:
+            map_predictions[map_name] = predictions.reverse()
+    return map_predictions
+
+
+def cache_predictions(matchId, prediction_dict):
+    for map_name, predictions in prediction_dict.items():
+        predictions = [float(prediction) for prediction in predictions]
+        prediction_dict[map_name] = predictions
+    unplayed_matches.update_one(
+        {"hltvId": matchId}, {"$set": {"predictions": prediction_dict}}
+    )
+
+
 def generate_prediction(match, same_order=True, ignore_cache=False):
     if not ignore_cache:
         cached_predictions = get_cached_predictions(match["hltvId"], same_order)
@@ -160,26 +180,6 @@ def confirm_bet(matchId, betted_markets):
     betted_markets = {**unplayed_match["betted"], **betted_markets}
     unplayed_matches.update_one(
         {"hltvId": matchId}, {"$set": {"betted": betted_markets}}
-    )
-
-
-def get_cached_predictions(matchId, same_order):
-    match = unplayed_matches.find_one({"hltvId": matchId})
-    if not match or "predictions" not in match or match["predictions"] == None:
-        return None
-    map_predictions = match["predictions"]
-    for map_name, predictions in map_predictions.items():
-        if not same_order:
-            map_predictions[map_name] = predictions.reverse()
-    return map_predictions
-
-
-def cache_predictions(matchId, prediction_dict):
-    for map_name, predictions in prediction_dict.items():
-        predictions = [float(prediction) for prediction in predictions]
-        prediction_dict[map_name] = predictions
-    unplayed_matches.update_one(
-        {"hltvId": matchId}, {"$set": {"predictions": prediction_dict}}
     )
 
 

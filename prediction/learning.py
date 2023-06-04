@@ -24,17 +24,7 @@ feature_frame = None
 feature_matrix = None
 examine_frame = None
 examine_ids = map_ids_to_examine()
-try:
-    examine_frame = pd.read_csv(
-        examine_frame_file_path,
-        index_col=[0],
-    )
-except:
-    print("Unable to get examine frame")
-try:
-    examine_ids = pd.read_csv(examine_ids_file_path, index_col=[0])
-except:
-    print("Unable to get examine ids")
+
 examine_matrix = None
 X = None
 y = None
@@ -57,16 +47,23 @@ except:
     try:
         # low_memory=False to get rid of mixed-type warning
         feature_frame = pd.read_csv(frame_file_path, index_col=[0], low_memory=False)
-        feature_frame = feature_frame.reindex(sorted(feature_frame.columns), axis=1)
-        examine_frame = feature_frame[feature_frame["map_id"].isin(examine_ids)]
+        feature_frame = (
+            feature_frame.reindex(sorted(feature_frame.columns), axis=1)
+            .drop("map_num", axis=1)
+            .dropna()
+        )
+        examine_frame = feature_frame[
+            (feature_frame["map_id"].astype("int").isin(examine_ids))
+        ]
         examine_ids = examine_frame["map_id"]
+
         examine_ids.to_csv(examine_ids_file_path)
         feature_frame = feature_frame[
             (feature_frame[label] != 0.5) & ~(feature_frame["map_id"].isin(examine_ids))
         ].dropna()
         print("Feature frame loaded, shape:", feature_frame.shape)
-        (feature_frame, y) = process_frame(feature_frame, label)
-        (examine_frame, examine_y) = process_frame(examine_frame, label)
+        (feature_frame, y, sample_weights) = process_frame(feature_frame, label)
+        (examine_frame, examine_y, _) = process_frame(examine_frame, label)
         examine_frame.to_csv(examine_frame_file_path)
 
         # feature_frame.info(verbose=True)
@@ -74,7 +71,11 @@ except:
         # with open("f.txt", "w") as f:
         #     f.write("\n".join(sorted(list(feature_frame.columns))))
         feature_matrix = np.hstack(
-            [feature_frame.drop(label, axis=1).to_numpy(), np.array([y]).T]
+            [
+                feature_frame.drop(label, axis=1).to_numpy(),
+                np.array([sample_weights]).T,
+                np.array([y]).T,
+            ]
         )
         np.save(matrix_file_path, feature_matrix)
     except Exception as e:
@@ -83,13 +84,29 @@ except:
 
 print("Feature matrix processed, shape:", feature_matrix.shape)
 
+try:
+    examine_frame = pd.read_csv(
+        examine_frame_file_path,
+        index_col=[0],
+    )
+except:
+    print("Unable to get examine frame")
+try:
+    examine_ids = pd.read_csv(examine_ids_file_path, index_col=[0])
+except:
+    print("Unable to get examine ids")
 
 clfs = []
 
-X = feature_matrix[:, :-1]
 y = feature_matrix[:, -1]
+X = feature_matrix[:, :-1]
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.0001)
+
+X_train_weights = X_train[:, -1]
+X_train = X_train[:, :-1]
+
+X_test = X_test[:, :-1]
 
 
 # # Split into training and test sets
@@ -187,6 +204,10 @@ def build_model(hp=None):
             keras.metrics.SparseCategoricalAccuracy(name="acc"),
             # keras.metrics.F1Score(),
         ],
+        weighted_metrics=[
+            keras.losses.sparse_categorical_crossentropy,
+            keras.metrics.sparse_categorical_accuracy,
+        ],
     )
 
     return model
@@ -194,10 +215,10 @@ def build_model(hp=None):
 
 # normalized_X = normalization_layer(X_train)
 normalized_X = X_train
-
-batch_size = 24
+print(examine_ids["map_id"])
+batch_size = 32
 epoch_num = 32
-validation_split = 0.1
+validation_split = 0.25
 # stop_early = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3)
 scores = []
 model = None
@@ -214,14 +235,17 @@ for i in range(1):
             tf.keras.callbacks.EarlyStopping(monitor="val_acc", patience=3),
             tf.keras.callbacks.CSVLogger("metrics.csv"),
         ],
+        # sample_weight=X_train_weights,
     )
     # scores.append(model.evaluate(X_test, y_test)[1])
 # print(np.mean(scores))
 
-model.evaluate(examine_frame.drop(label, axis=1), examine_frame[label])
+print(examine_frame, examine_ids)
+model.evaluate(examine_frame.drop(label, axis=1), examine_frame[label], batch_size=1)
 for i, data_point in examine_frame.drop(label, axis=1).iterrows():
     print(examine_ids["map_id"][i], model.predict(np.array([data_point.to_numpy()])))
 
+full_examine = pd.concat([examine_ids, examine_frame], axis=1)
 
 print(np.array([X_test[0]]).shape)
 

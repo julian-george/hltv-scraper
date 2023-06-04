@@ -31,6 +31,7 @@ column_names.append("event_avg_rankings")
 column_names.append("event_stdev_rankings")
 column_names.append("bestof")
 column_names.append("map_id")
+column_names.append("map_num")
 
 # extremely flawed metric but
 # column_names.append("match_category")
@@ -85,7 +86,7 @@ for suffix in team_suffixes:
     column_names.append(f"total_avg_ctwinrate_{suffix}")
     column_names.append(f"total_avg_otwinrate_{suffix}")
 
-    # column_names.append(f"map_pick_{suffix}")
+    column_names.append(f"map_pick_{suffix}")
 
 
 matchup_category = "matchup"
@@ -107,38 +108,19 @@ for category in stat_categories:
 feature_data.frame = pd.DataFrame(columns=column_names)
 feature_data.history = set()
 # feature_data.history = None
-feature_data.to_exit = False
 
 try:
     feature_data.frame = pd.read_csv(frame_file_path, index_col=[0])
+    feature_data.history = set(feature_data.frame["map_id"])
     print("Feature frame loaded, shape", feature_data.frame.shape)
 except:
     print(f"Unable to load frame from {frame_file_path}.")
-
-try:
-    map_history_file = open(map_history_file_path, "r")
-    feature_data.history = set(json.loads(map_history_file.read()))
-    map_history_file.close()
-    print("Map history file loaded, length:", len(feature_data.history))
-except:
-    print(f"Unable to load map history from {map_history_file_path}")
-
-
-def signal_exit():
-    feature_data.to_exit = True
 
 
 def save_frame():
     print(f"Saving frame to {frame_file_path}, shape", feature_data.frame.shape)
     feature_data.frame.sort_values(by=["map_id"])
     feature_data.frame.to_csv(frame_file_path)
-
-
-def save_map_history():
-    if feature_data.history != None:
-        map_history_file = open(map_history_file_path, "w+")
-        map_history_file.write(json.dumps(list(feature_data.history)))
-        map_history_file.close()
 
 
 start_time = datetime.now()
@@ -156,16 +138,19 @@ def print_process_rate():
         print(f"Average of {maps_per_minute} processed per minute.")
 
 
-atexit.register(signal_exit)
-atexit.register(save_map_history)
 atexit.register(save_frame)
 atexit.register(print_process_rate)
 
-num_maps = maps.count_documents({})
+num_maps = maps.count_documents(
+    {"hltvId": {"$not": {"$in": list(feature_data.history or [])}}}
+)
+print("nummaps", num_maps)
 
 thread_num = 8
 
 slice_size = np.ceil(num_maps / thread_num)
+
+print(slice_size)
 
 frame_lock = threading.Lock()
 history_lock = threading.Lock()
@@ -175,6 +160,14 @@ for i in range(thread_num):
     maps_slice = list(
         maps.aggregate(
             [
+                {
+                    "$match": {
+                        "hltvId": {"$not": {"$in": list(feature_data.history or [])}}
+                    }
+                },
+                {"$sort": {"hltvId": -1}},
+                {"$skip": slice_size * i},
+                {"$limit": slice_size},
                 {
                     "$lookup": {
                         "from": "matches",
@@ -199,9 +192,6 @@ for i in range(thread_num):
                         "as": "players_info",
                     }
                 },
-                {"$sort": {"date": -1}},
-                {"$skip": slice_size * i},
-                {"$limit": slice_size},
             ],
             allowDiskUse=True,
         )
@@ -209,6 +199,7 @@ for i in range(thread_num):
 
     threading.Thread(
         target=process_maps,
-        args=(maps_slice, frame_lock, history_lock, exit_lock, feature_data, i),
+        daemon=True,
+        args=(maps_slice, frame_lock, feature_data, i),
     ).start()
     time.sleep(1)
