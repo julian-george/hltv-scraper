@@ -414,12 +414,13 @@ def matchup_condition(team_one_ids, team_two_ids):
     )
 
 
-def generate_data_point(curr_map, played=True, map_name=None):
+def generate_data_point(curr_map, played=True, map_info=None):
     w = {}
     related_match = curr_map["match"][0] if played else None
     related_event = curr_map["event"][0]
     winner = np.random.randint(2) if played else 1
     raw_date = related_match["date"] if related_match else curr_map["date"]
+    map_name = curr_map["mapType"] if played else map_info["map_name"]
     w["map_date"] = quantize_time(raw_date)
     team_one_ids = (
         [
@@ -480,14 +481,12 @@ def generate_data_point(curr_map, played=True, map_name=None):
     team_one_ages = [default_birth_year - min_birth_year]
     team_two_ages = [default_birth_year - min_birth_year]
 
-    w["map_pick_team_one"] = curr_map.get("pickedBy", "") == (
-        "teamOne" if winner == 1 else "teamTwo"
-    )
-    w["map_pick_team_two"] = curr_map.get("pickedBy", "") == (
-        "teamTwo" if winner == 1 else "teamOne"
-    )
+    picked_by = curr_map.get("pickedBy", "") if played else map_info["picked_by"]
 
-    w["map_num"] = curr_map.get("mapNum", 0)
+    w["map_pick_team_one"] = picked_by == ("teamOne" if winner == 1 else "teamTwo")
+    w["map_pick_team_two"] = picked_by == ("teamTwo" if winner == 1 else "teamOne")
+
+    w["map_num"] = curr_map.get("mapNum", 0) if played else map_info["map_num"]
 
     for player in (
         curr_map["players_info"]
@@ -582,8 +581,8 @@ def process_maps(maps_to_process, frame_lock, feature_data, thread_idx):
     for map_idx in range(len(maps_to_process)):
         curr_map = maps_to_process[map_idx]
         print(f"[{thread_idx}] Processing map ID:", curr_map["hltvId"])
-        w = generate_data_point(curr_map, map_name=curr_map["mapType"])
-        if len(w.keys()) != feature_data.frame.shape[1]:
+        w = generate_data_point(curr_map)
+        if w == None or len(w.keys()) != feature_data.frame.shape[1]:
             print("Partial datapoint for map id", curr_map["hltvId"])
             continue
 

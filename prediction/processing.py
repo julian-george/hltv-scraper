@@ -196,10 +196,8 @@ for i in range(thread_num):
             allowDiskUse=True,
         )
     )
-
     threading.Thread(
         target=process_maps,
-        daemon=True,
         args=(maps_slice, frame_lock, feature_data, i),
     ).start()
     time.sleep(1)

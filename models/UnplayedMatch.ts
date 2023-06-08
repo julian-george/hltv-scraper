@@ -26,8 +26,12 @@ export const unplayedMatchSchema = new Schema({
     type: Object,
     default: {},
   },
-  mapNames: {
-    type: [String],
+  bettedInfos: {
+    type: Object,
+    default: null,
+  },
+  mapInfos: {
+    type: [Object],
     default: [],
   },
   pickedBy: {
@@ -39,6 +43,7 @@ export const unplayedMatchSchema = new Schema({
     type: Object,
     default: null,
   },
+  sameOrder: Boolean,
 });
 
 const UnplayedMatch = model("UnplayedMatch", unplayedMatchSchema);

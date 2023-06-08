@@ -6,8 +6,9 @@ from multiprocessing.pool import ThreadPool
 from time import sleep
 from datetime import datetime, timedelta
 from webdriver_manager.chrome import ChromeDriverManager
+from undetected_chromedriver import Chrome, ChromeOptions
 
-from selenium.webdriver import Chrome, ChromeOptions
+# from selenium.webdriver import Chrome,ChromeOptions
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
@@ -17,19 +18,22 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.core.utils import ChromeType
 from pyvirtualdisplay import Display
 
-from predicting import predict_match, confirm_bet, set_maps
+from predicting import predict_match, confirm_bet, set_maps, get_match_by_team_names
 
 
 ignored_exceptions = [StaleElementReferenceException]
 
 prediction_threshold = timedelta(minutes=10)
-bet_percent = 0.05
-small_bet_percent = 0.01
+bet_percent = 0.02
+small_bet_percent = 0.005
 
 total_balance = None
 
 
-service = Service(executable_path=ChromeDriverManager().install())
+service = Service(
+    executable_path=ChromeDriverManager(version="114.0.5735.90").install()
+)
+# service = None
 options = ChromeOptions()
 options.add_argument("--no-sandbox")
 options.add_argument(f"user-data-dir={os.environ['CHROME_PROFILE_DIR']}")
@@ -100,16 +104,16 @@ def market_bet(prediction, market_element, bet_browser):
         print(f"[{str(datetime.now())}] Current Balance: $" + str(total_balance))
     except Exception:
         print("Market locked")
-        return False
-    print("calculating odds")
+        return None
     total_odds = (page_home_odds - 1) + (page_away_odds - 1)
     # counterintuitive, but for example if away odds are 12, we want new home odds to be high, not new away odds
-
     home_odds = (page_away_odds - 1) / total_odds
     away_odds = (page_home_odds - 1) / total_odds
     home_win = False
+    betted_odds = away_odds
     if prediction[0] >= 0.4 and prediction[0] >= home_odds:
         home_win = True
+        betted_odds = home_odds
         home_button.click()
         print(
             f"Betting home - prediction: {prediction[0]}, odds: {home_odds}, unadjusted {page_home_odds}"
@@ -121,7 +125,12 @@ def market_bet(prediction, market_element, bet_browser):
         )
     else:
         print(f"No bet made. Prediction: {prediction}, odds: {[home_odds,away_odds]}")
-        return True
+        return {
+            "prediction": prediction,
+            "odds": [home_odds, away_odds],
+            "betted_amount": 0,
+            "betted_odds": None,
+        }
     try:
         pending_bet_input = WebDriverWait(
             bet_browser, 30, ignored_exceptions=ignored_exceptions
@@ -160,13 +169,18 @@ def market_bet(prediction, market_element, bet_browser):
         )
         close_bets(bet_browser)
 
-        return True
+        return {
+            "prediction": prediction,
+            "odds": [home_odds, away_odds],
+            "betted_amount": amount_to_bet,
+            "betted_odds": betted_odds,
+        }
 
     except Exception as e:
         print("Error while confirming bet")
         print(traceback.format_exc())
         close_bets(bet_browser)
-        return False
+        return None
 
 
 def match_bet(predictions_dict, bet_url, num_maps, bet_browser=None):
@@ -226,7 +240,8 @@ def match_bet(predictions_dict, bet_url, num_maps, bet_browser=None):
         #         ),
         #     )
         # )
-        print("Betting", title, bet_url)
+        print("Betting", title, bet_url, predictions_dict)
+        sleep(0.5)
         successful_bets[title] = market_bet(
             predictions_dict[title], element, bet_browser
         )
@@ -249,7 +264,9 @@ def make_bets(browser=None):
     browser.get("https://thunderpick.io/en/esports/csgo")
     # if this doesn't exist, we aren't signed in
     try:
-        user_element = browser.find_element(By.CLASS_NAME, "user-summary")
+        user_element = WebDriverWait(
+            browser, 10, ignored_exceptions=ignored_exceptions
+        ).until(EC.presence_of_element_located((By.CLASS_NAME, "user-summary")))
     except:
         print("Trying to log in...")
         login(browser)
@@ -340,7 +357,7 @@ def make_bets(browser=None):
             )
             .text
         )
-        (predictions, match) = predict_match(home_team, away_team)
+        match = get_match_by_team_names(home_team, away_team)
         # if this match isnt in the database or it has been fully bet on, skip
         if match == None:
             print("No match found for", home_team, away_team)
@@ -351,7 +368,7 @@ def make_bets(browser=None):
                 [
                     map_betted
                     for map_betted in match["betted"].values()
-                    if map_betted == True
+                    if map_betted != None
                 ]
             )
             == match["numMaps"]
@@ -359,28 +376,44 @@ def make_bets(browser=None):
             print("All maps betted for", home_team, away_team)
             urls_to_skip.append(bet_url)
             continue
-        map_names = [map_name for map_name in match["mapNames"]]
-        if len(map_names) == 0:
+        map_infos = match.get("mapInfos", [])
+        if len(map_infos) != match["numMaps"]:
+            # do this for edge case that only one map is TBA to prevent adding duplicate maps
+            map_infos = []
             browser.get("https://www.hltv.org" + match["matchUrl"])
-            map_names = list(
-                map(
-                    lambda map_ele: map_ele.text,
-                    browser.find_elements(
-                        By.CSS_SELECTOR, "div.map-name-holder > div.mapname"
-                    ),
-                ),
+            WebDriverWait(browser, 10, ignored_exceptions=ignored_exceptions).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "div.mapholder"))
             )
+            mapholders = browser.find_elements(By.CSS_SELECTOR, "div.mapholder")
+            for i, holder in enumerate(mapholders):
+                map_name = holder.find_element(By.CSS_SELECTOR, "div.mapname").text
+                picked_by = None
+                left_picked = (
+                    len(holder.find_elements(By.CSS_SELECTOR, "div.results-left.pick"))
+                    == 1
+                )
+                right_picked = (
+                    len(holder.find_elements(By.CSS_SELECTOR, "div.results-right.pick"))
+                    == 1
+                )
+                if left_picked:
+                    picked_by = "teamOne"
+                elif right_picked:
+                    picked_by = "teamTwo"
+                map_info = {"map_name": map_name, "picked_by": picked_by, "map_num": i}
+                map_infos.append(map_info)
 
             set_maps(
                 match["hltvId"],
-                [map_name for map_name in map_names if map_name != "TBA"],
+                [map_info for map_info in map_infos if map_info["map_name"] != "TBA"],
             )
-
+        map_names = list(map(lambda info: info["map_name"], map_infos))
         market_prediction_dict = {}
         if "TBA" in map_names:
             print("Maps still TBA")
             sleep_length = 30
             continue
+        predictions = predict_match(match, home_team, away_team, map_infos)
         if len(map_names) == 1:
             market_prediction_dict["Match"] = predictions[map_names[0]]
         else:
@@ -415,7 +448,7 @@ def make_bets(browser=None):
     return sleep_length
 
 
-browser = Chrome(service=service, options=options)
+browser = Chrome(options=options)
 while True:
     sleep_length = 60 * 30
     try:

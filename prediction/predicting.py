@@ -15,7 +15,7 @@ matches = db["matches"]
 maps = db["maps"]
 
 model_name = "prediction_model"
-model = tf.keras.models.load_model(model_name)
+
 
 # conditions to be added to aggregation pipeline
 aggregate_list = [
@@ -99,33 +99,37 @@ def cache_predictions(matchId, prediction_dict):
     )
 
 
-def generate_prediction(match, same_order=True, ignore_cache=False):
+def generate_prediction(match, map_list, same_order=True, ignore_cache=False):
     if not ignore_cache:
         cached_predictions = get_cached_predictions(match["hltvId"], same_order)
-        if cached_predictions != None:
+        if (
+            cached_predictions != None
+            and not None in cached_predictions.values()
+            and cached_predictions != {}
+        ):
             return cached_predictions
     print("Generating new predictions...")
+    model = tf.keras.models.load_model(model_name)
     map_predictions = {}
-    for map_type in map_types:
-        w = generate_data_point(match, played=False, map_name=map_type)
+    for i, map_info in enumerate(map_list):
+        w = generate_data_point(match, played=False, map_info=map_info)
         processed_w = process_frame(pd.DataFrame([w]))[0]
         # with open("t.txt", "w") as f:
         #     f.write("\n".join(sorted(list(processed_w.columns))))
         processed_w.to_csv("test.csv")
         processed_w = processed_w.to_numpy()
         prediction = list(model.predict(processed_w, verbose=False)[0])
-        map_predictions[map_type] = prediction
+        map_predictions[map_info["map_name"]] = prediction
     cache_predictions(match["hltvId"], map_predictions)
     for map_name, predictions in map_predictions.items():
         if not same_order:
-            map_predictions[map_name] = predictions.reverse()
+            map_predictions[map_name].reverse()
     return map_predictions
 
 
-def predict_match(team_one_name, team_two_name):
+def get_match_by_team_names(team_one_name, team_two_name):
     team_one_name = trim_team_name(team_one_name)
     team_two_name = trim_team_name(team_two_name)
-    same_order = True
     regex_query = {
         "$match": {
             "$and": [
@@ -134,29 +138,67 @@ def predict_match(team_one_name, team_two_name):
             ]
         }
     }
-    match = unplayed_matches.aggregate([regex_query] + aggregate_list)
-    if not match._has_next():
-        return ({}, None)
-    match = match.next()
-    print(team_one_name, team_two_name, match["title"])
-    if match["title"].index(team_one_name) > match["title"].index(team_two_name):
-        same_order = False
-    map_predictions = generate_prediction(match, same_order)
-    return (map_predictions, match)
+    match_cursor = unplayed_matches.aggregate([regex_query] + aggregate_list)
+    if not match_cursor._has_next():
+        return None
+    return match_cursor.next()
+
+
+def predict_match(match, team_one_name, team_two_name, map_infos):
+    team_one_name = trim_team_name(team_one_name)
+    team_two_name = trim_team_name(team_two_name)
+    same_order = match["title"].index(team_one_name) < match["title"].index(
+        team_two_name
+    )
+    map_predictions = generate_prediction(match, map_infos, same_order)
+    return map_predictions
+
+
+default_map_infos = [
+    {"map_name": map_name, "picked_by": None, "map_num": 0} for map_name in map_types
+]
+
+
+def maps_to_examine():
+    map_list = []
+    all_unplayed = list(unplayed_matches.find({}))
+    for unplayed in all_unplayed:
+        hltv_id = unplayed["hltvId"]
+        played = matches.find_one({"hltvId": hltv_id})
+        if played:
+            related_maps = list(maps.find({"matchId": played["hltvId"]}))
+            for r_map in related_maps:
+                map_list.append(r_map)
+    return map_list
+
+
+def map_ids_to_examine():
+    maps = maps_to_examine()
+    return [map_dict["hltvId"] for map_dict in maps]
+
+
+def match_ids_to_examine():
+    maps = maps_to_examine()
+    return [map_dict["matchId"] for map_dict in maps]
 
 
 def predict_all_matches():
     all_matches = list(unplayed_matches.aggregate(aggregate_list))
-    print("Predicting", len(all_matches), "matches...")
+    played_match_ids = match_ids_to_examine()
+    all_unplayed = [
+        match for match in all_matches if not match["hltvId"] in played_match_ids
+    ]
+    print("Predicting", len(all_unplayed), "matches...")
     predictions = {}
-    for match in all_matches:
-        predictions[match["title"]] = generate_prediction(match)
+    for match in all_unplayed:
+        predictions[match["title"]] = generate_prediction(match, default_map_infos)
     return predictions
 
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
         all_predictions = predict_all_matches()
+
         for title, pred in all_predictions.items():
             print(title)
             for map_name, odds in pred.items():
@@ -172,7 +214,7 @@ if __name__ == "__main__":
 
 
 def set_maps(matchId, maps):
-    unplayed_matches.update_one({"hltvId": matchId}, {"$set": {"mapNames": maps}})
+    unplayed_matches.update_one({"hltvId": matchId}, {"$set": {"mapInfos": maps}})
 
 
 def confirm_bet(matchId, betted_markets):
@@ -181,16 +223,3 @@ def confirm_bet(matchId, betted_markets):
     unplayed_matches.update_one(
         {"hltvId": matchId}, {"$set": {"betted": betted_markets}}
     )
-
-
-def map_ids_to_examine():
-    ids = []
-    all_unplayed = list(unplayed_matches.find({}))
-    for unplayed in all_unplayed:
-        hltv_id = unplayed["hltvId"]
-        played = matches.find_one({"hltvId": hltv_id})
-        if played:
-            related_maps = list(maps.find({"matchId": played["hltvId"]}))
-            for r_map in related_maps:
-                ids.append(r_map["hltvId"])
-    return ids

@@ -2,18 +2,18 @@
   "scrapeCached": false,
   "onlyScrapePlayed": false,
   "results": {
-    "offset": 60000,
-    "finishUponDuplicate": false,
+    "offset": 0,
+    "finishUponDuplicate": true,
     "traverseAdded": false,
-    "overwriteMatches": true
+    "overwriteMatches": false
   },
   "unplayedMatches": {
     "daysToScrape": 3,
     "overwrite": false
   },
   "browsers": {
-    "limit": 16,
-    "numHeadful": 16,
+    "limit": 12,
+    "numHeadful": 12,
     "maxChallengeAttempts": 12,
     "forceHeadful": true,
     "forceHeadless": false,

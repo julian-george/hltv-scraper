@@ -23,7 +23,7 @@ matrix_file_path = "cached-matrix.npy"
 feature_frame = None
 feature_matrix = None
 examine_frame = None
-examine_ids = map_ids_to_examine()
+examine_ids = map_ids_to_examine()[:-30:2]
 
 examine_matrix = None
 X = None
@@ -47,11 +47,7 @@ except:
     try:
         # low_memory=False to get rid of mixed-type warning
         feature_frame = pd.read_csv(frame_file_path, index_col=[0], low_memory=False)
-        feature_frame = (
-            feature_frame.reindex(sorted(feature_frame.columns), axis=1)
-            .drop("map_num", axis=1)
-            .dropna()
-        )
+        feature_frame = feature_frame.reindex(sorted(feature_frame.columns), axis=1)
         examine_frame = feature_frame[
             (feature_frame["map_id"].astype("int").isin(examine_ids))
         ]
@@ -235,15 +231,15 @@ for i in range(1):
             tf.keras.callbacks.EarlyStopping(monitor="val_acc", patience=3),
             tf.keras.callbacks.CSVLogger("metrics.csv"),
         ],
-        # sample_weight=X_train_weights,
+        # it's unclear if this actually improves betting performance
+        sample_weight=X_train_weights,
     )
     # scores.append(model.evaluate(X_test, y_test)[1])
 # print(np.mean(scores))
 
-print(examine_frame, examine_ids)
 model.evaluate(examine_frame.drop(label, axis=1), examine_frame[label], batch_size=1)
-for i, data_point in examine_frame.drop(label, axis=1).iterrows():
-    print(examine_ids["map_id"][i], model.predict(np.array([data_point.to_numpy()])))
+# for i, data_point in examine_frame.drop(label, axis=1).iterrows():
+#     print(examine_ids["map_id"][i], model.predict(np.array([data_point.to_numpy()])))
 
 full_examine = pd.concat([examine_ids, examine_frame], axis=1)
 
