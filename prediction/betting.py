@@ -436,7 +436,7 @@ def make_bets(browser=None):
         betted_markets = match_bet(
             market_prediction_dict, bet_url, match["numMaps"], browser
         )
-        if False in betted_markets.values():
+        if None in betted_markets.values():
             sleep_length = 30
         confirm_bet(match["hltvId"], betted_markets)
 

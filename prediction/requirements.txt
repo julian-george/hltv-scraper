@@ -6,4 +6,4 @@ pyvirtualdisplay
 numpy
 pandas
 scikit-learn
-undetected-chrome
+undetected-chromedriver
