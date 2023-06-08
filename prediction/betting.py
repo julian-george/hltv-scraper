@@ -68,6 +68,7 @@ def market_bet(prediction, market_element, bet_browser):
     page_home_odds = None
     page_away_odds = None
     total_balance = None
+    close_bets(bet_browser)
     # print(market_element.get_attribute("innerHTML"))
     try:
         odds_wait = WebDriverWait(
