@@ -245,7 +245,7 @@ full_examine = pd.concat([examine_ids, examine_frame], axis=1)
 
 print(np.array([X_test[0]]).shape)
 
-model_path = "prediction_model"
+model_path = "./prediction_model"
 
 print("Saving Model")
 model.save(model_path)
