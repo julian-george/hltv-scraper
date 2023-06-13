@@ -224,7 +224,8 @@ export const parseMatch = async (
                 rankings,
                 mapUrl,
                 picks[mapId],
-                i
+                i,
+                date
               )
                 .catch((err) => {
                   console.error(

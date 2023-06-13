@@ -7,6 +7,7 @@ import numpy as np
 import tensorflow as tf
 import pandas as pd
 import keras_tuner
+from datetime import datetime
 
 # import tensorflow_model_optimization as tfmot
 from tensorflow import keras
@@ -48,6 +49,8 @@ except:
         # low_memory=False to get rid of mixed-type warning
         feature_frame = pd.read_csv(frame_file_path, index_col=[0], low_memory=False)
         feature_frame = feature_frame.reindex(sorted(feature_frame.columns), axis=1)
+        feature_frame = feature_frame.sort_values(by=["map_date"])
+        feature_frame.to_csv("sorted_saved.csv")
         examine_frame = feature_frame[
             (feature_frame["map_id"].astype("int").isin(examine_ids))
         ]
@@ -97,13 +100,38 @@ clfs = []
 y = feature_matrix[:, -1]
 X = feature_matrix[:, :-1]
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.0001)
+X_train = X
+y_train = y
+
+num_test_sets = 30
+test_set_size = 245
+
+test_sets = []
+
+date_column = list(feature_frame.columns).index("map_date")
+
+for i in range(num_test_sets):
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_train, y_train, test_size=245, shuffle=False
+    )
+    print(X_test[0, date_column])
+    test_sets.append(
+        (
+            X_test[:, :-1],
+            y_test,
+            datetime.fromtimestamp(X_test[0, date_column] * 360000),
+        )
+    )
+
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X_train, y_train, test_size=1, shuffle=True
+)
 
 X_train_weights = X_train[:, -1]
 X_train = X_train[:, :-1]
 
 X_test = X_test[:, :-1]
-
 
 # # Split into training and test sets
 # rf_train_pd, rf_test_pd = split_dataset(feature_frame)
@@ -225,7 +253,7 @@ for i in range(1):
         normalized_X,
         y_train,
         batch_size=batch_size,
-        validation_split=validation_split,
+        validation_split=0.2,
         epochs=epoch_num,
         callbacks=[
             tf.keras.callbacks.EarlyStopping(monitor="val_acc", patience=3),
@@ -234,16 +262,16 @@ for i in range(1):
         # it's unclear if this actually improves betting performance
         sample_weight=X_train_weights,
     )
-    # scores.append(model.evaluate(X_test, y_test)[1])
-# print(np.mean(scores))
+    for test_set in test_sets:
+        print(test_set[2])
+        scores.append(model.evaluate(test_set[0], test_set[1], batch_size=1)[1])
+print(np.mean(scores))
 
 model.evaluate(examine_frame.drop(label, axis=1), examine_frame[label], batch_size=1)
 # for i, data_point in examine_frame.drop(label, axis=1).iterrows():
 #     print(examine_ids["map_id"][i], model.predict(np.array([data_point.to_numpy()])))
 
 full_examine = pd.concat([examine_ids, examine_frame], axis=1)
-
-print(np.array([X_test[0]]).shape)
 
 model_path = "./prediction_model"
 

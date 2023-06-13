@@ -46,11 +46,11 @@ map_list = [
 
 
 def quantize_timedelta(date):
-    return np.round(date.total_seconds() / 360, 5)
+    return np.round(date.total_seconds(), 5)
 
 
 def quantize_time(date):
-    return np.round(date.timestamp() / 360000, 5)
+    return np.round(date.timestamp(), 5)
 
 
 def get_map_vector(map_name):
@@ -62,7 +62,7 @@ def get_map_vector(map_name):
 #  as of 4/7/23, max observed ranking is 404
 max_ranking = 500
 
-min_date = maps.find({"date": {"$ne": None}}).sort("date").limit(1).next()["date"]
+
 min_birth_year = (
     players.find({"birthYear": {"$ne": None}})
     .sort("birthYear")
@@ -419,7 +419,7 @@ def generate_data_point(curr_map, played=True, map_info=None):
     related_match = curr_map["match"][0] if played else None
     related_event = curr_map["event"][0]
     winner = np.random.randint(2) if played else 1
-    raw_date = related_match["date"] if related_match else curr_map["date"]
+    raw_date = related_match["date"] if played else curr_map["date"]
     map_name = curr_map["mapType"] if played else map_info["map_name"]
     w["map_date"] = quantize_time(raw_date)
     team_one_ids = (
@@ -543,7 +543,6 @@ def generate_data_point(curr_map, played=True, map_info=None):
             ]
         )
     )
-
     condition_dict = {
         matchup_category: matchup_condition(team_one_ids, team_two_ids),
         "map": map_condition(map_name),

@@ -119,7 +119,7 @@ except:
 
 def save_frame():
     print(f"Saving frame to {frame_file_path}, shape", feature_data.frame.shape)
-    feature_data.frame.sort_values(by=["map_id"])
+    feature_data.frame.sort_values(by=["map_id"], inplace=True)
     feature_data.frame.to_csv(frame_file_path)
 
 
@@ -144,13 +144,12 @@ atexit.register(print_process_rate)
 num_maps = maps.count_documents(
     {"hltvId": {"$not": {"$in": list(feature_data.history or [])}}}
 )
-print("nummaps", num_maps)
 
 thread_num = 8
 
 slice_size = np.ceil(num_maps / thread_num)
 
-print(slice_size)
+print(f"Processing {num_maps} in {thread_num} slices of {slice_size}")
 
 frame_lock = threading.Lock()
 history_lock = threading.Lock()
@@ -166,7 +165,7 @@ for i in range(thread_num):
                     }
                 },
                 {"$sort": {"hltvId": -1}},
-                {"$skip": slice_size * i},
+                {"$skip": 20000},
                 {"$limit": slice_size},
                 {
                     "$lookup": {

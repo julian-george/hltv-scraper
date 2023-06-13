@@ -54,8 +54,6 @@ duel_map_threshold = 18 * month_delta
 #  as of 4/7/23, max observed ranking is 404
 max_ranking = 500
 
-min_date = maps.find({"date": {"$ne": None}}).sort("date").limit(1).next()["date"]
-
 
 # @profile
 def get_duels(team_one_ids, team_two_ids, date, performances):
@@ -609,7 +607,7 @@ def generate_data_point(curr_map, played=True, map_type=None):
     related_match = curr_map["match"][0] if played else None
     raw_date = related_match["date"] if related_match else curr_map["date"]
     # datetime rounded to the minute
-    date = np.round((raw_date.timestamp() - min_date.timestamp()) / 360000, 5)
+    date = np.round((raw_date.timestamp()) / 360000, 5)
     # i-0
     w["map_date"] = date
     # e.g bo1, bo3, etc
