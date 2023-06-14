@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import numpy as np
 import pandas as pd
 from datetime import timedelta
+from tqdm import tqdm
 
 load_dotenv()
 
@@ -415,174 +416,179 @@ def matchup_condition(team_one_ids, team_two_ids):
 
 
 def generate_data_point(curr_map, played=True, map_info=None):
-    w = {}
-    related_match = curr_map["match"][0] if played else None
-    related_event = curr_map["event"][0]
-    winner = np.random.randint(2) if played else 1
-    raw_date = related_match["date"] if played else curr_map["date"]
-    map_name = curr_map["mapType"] if played else map_info["map_name"]
-    w["map_date"] = quantize_time(raw_date)
-    team_one_ids = (
-        [
-            str(pid)
-            for pid in curr_map[
-                "teamOneStats" if winner == 1 else "teamTwoStats"
-            ].keys()
-        ]
-        if played
-        else [str(pid) for pid in curr_map["players"]["firstTeam"]]
-    )
-    team_two_ids = (
-        [
-            str(pid)
-            for pid in curr_map[
-                "teamTwoStats" if winner == 1 else "teamOneStats"
-            ].keys()
-        ]
-        if played
-        else [str(pid) for pid in curr_map["players"]["secondTeam"]]
-    )
-    if len(team_one_ids) != 5 or len(team_two_ids) != 5:
-        return None
-    online = related_match["online"] if played else curr_map["online"]
-    w["online_bool"] = online
-    w["event_teamnum"] = related_event["teamNum"]
-    w["bestof"] = related_match["numMaps"] if played else curr_map["numMaps"]
-    # w["match_category"] = related_match["matchTypeCategory"]
-    event_team_rankings = np.array(
-        list(
-            map(
-                # normalizes rankings by subtracting them by max observed ranking and turning to 0 if it's null
-                lambda ranking: max_ranking - ranking if ranking != None else 0,
-                related_event["teamRankings"],
+    try:
+        w = {}
+        related_match = curr_map["match"][0] if played else None
+        related_event = curr_map["event"][0]
+        winner = np.random.randint(2) if played else 1
+        raw_date = related_match["date"] if played else curr_map["date"]
+        map_name = curr_map["mapType"] if played else map_info["map_name"]
+        w["map_date"] = quantize_time(raw_date)
+        team_one_ids = (
+            [
+                str(pid)
+                for pid in curr_map[
+                    "teamOneStats" if winner == 1 else "teamTwoStats"
+                ].keys()
+            ]
+            if played
+            else [str(pid) for pid in curr_map["players"]["firstTeam"]]
+        )
+        team_two_ids = (
+            [
+                str(pid)
+                for pid in curr_map[
+                    "teamTwoStats" if winner == 1 else "teamOneStats"
+                ].keys()
+            ]
+            if played
+            else [str(pid) for pid in curr_map["players"]["secondTeam"]]
+        )
+        if len(team_one_ids) != 5 or len(team_two_ids) != 5:
+            return None
+        online = related_match["online"] if played else curr_map["online"]
+        w["online_bool"] = online
+        w["event_teamnum"] = related_event["teamNum"]
+        w["bestof"] = related_match["numMaps"] if played else curr_map["numMaps"]
+        # w["match_category"] = related_match["matchTypeCategory"]
+        event_team_rankings = np.array(
+            list(
+                map(
+                    # normalizes rankings by subtracting them by max observed ranking and turning to 0 if it's null
+                    lambda ranking: max_ranking - ranking if ranking != None else 0,
+                    related_event["teamRankings"],
+                )
             )
         )
-    )
-    # mean and stdev of team rankings at event
-    event_team_rankings_analyzed = {
-        "event_avg_rankings": np.mean(event_team_rankings),
-        "event_stdev_rankings": np.std(event_team_rankings),
-    }
-    w |= event_team_rankings_analyzed
+        # mean and stdev of team rankings at event
+        event_team_rankings_analyzed = {
+            "event_avg_rankings": np.mean(event_team_rankings),
+            "event_stdev_rankings": np.std(event_team_rankings),
+        }
+        w |= event_team_rankings_analyzed
 
-    ranking_one = (
-        max_ranking - curr_map["teamOneRanking"]
-        if curr_map["teamOneRanking"] != None
-        else 0
-    )
-    ranking_two = (
-        max_ranking - curr_map["teamTwoRanking"]
-        if curr_map["teamTwoRanking"] != None
-        else 0
-    )
-    w["ranking_team_one"] = ranking_one if winner == 1 else ranking_two
-    w["ranking_team_two"] = ranking_two if winner == 1 else ranking_one
-
-    team_one_ages = [default_birth_year - min_birth_year]
-    team_two_ages = [default_birth_year - min_birth_year]
-
-    picked_by = curr_map.get("pickedBy", "") if played else map_info["picked_by"]
-
-    w["map_pick_team_one"] = picked_by == ("teamOne" if winner == 1 else "teamTwo")
-    w["map_pick_team_two"] = picked_by == ("teamTwo" if winner == 1 else "teamOne")
-
-    w["map_num"] = curr_map.get("mapNum", 0) if played else map_info["map_num"]
-
-    for player in (
-        curr_map["players_info"]
-        if played
-        else curr_map["players_info_first"] + curr_map["players_info_second"]
-    ):
-        if player["birthYear"] != None:
-            adjusted_birth_year = player["birthYear"] - min_birth_year
-            if str(player["hltvId"]) in team_one_ids:
-                team_one_ages.append(adjusted_birth_year)
-            elif str(player["hltvId"]) in team_two_ids:
-                team_two_ages.append(adjusted_birth_year)
-
-    w["age_avg_team_one"] = np.mean(team_one_ages)
-    w["age_avg_team_two"] = np.mean(team_two_ages)
-
-    w |= get_map_vector(map_name)
-
-    performances = list(
-        maps.aggregate(
-            [
-                {
-                    "$lookup": {
-                        "from": "matches",
-                        "localField": "matchId",
-                        "foreignField": "hltvId",
-                        "as": "match",
-                    }
-                },
-                {
-                    "$lookup": {
-                        "from": "events",
-                        "localField": "match.0.eventId",
-                        "foreignField": "hltvId",
-                        "as": "event",
-                    }
-                },
-                {
-                    "$match": {
-                        "$and": [
-                            {"date": {"$lt": raw_date}},
-                            {"date": {"$gte": raw_date - max_threshold}},
-                            {
-                                "players": {
-                                    "$in": [
-                                        int(pid) for pid in team_one_ids + team_two_ids
-                                    ]
-                                }
-                            },
-                        ]
-                    }
-                },
-                {"$sort": {"date": -1}},
-            ]
+        ranking_one = (
+            max_ranking - curr_map["teamOneRanking"]
+            if curr_map["teamOneRanking"] != None
+            else 0
         )
-    )
-    condition_dict = {
-        matchup_category: matchup_condition(team_one_ids, team_two_ids),
-        "map": map_condition(map_name),
-        "online": online_condition(online),
-        "event": event_condition(related_event["hltvId"]),
-        "rank": rank_condition(team_one_ids, ranking_one, ranking_two),
-    }
-
-    results_data = generate_round_rating_stats(
-        team_one_ids, team_two_ids, performances, condition_dict, raw_date
-    )
-    w |= results_data
-
-    w["map_id"] = curr_map["hltvId"]
-    if played:
-        winner_score = (
-            curr_map["score"]["teamOne"]["ct"]
-            + curr_map["score"]["teamOne"]["t"]
-            + curr_map["score"]["teamOne"]["ot"]
+        ranking_two = (
+            max_ranking - curr_map["teamTwoRanking"]
+            if curr_map["teamTwoRanking"] != None
+            else 0
         )
-        loser_score = (
-            curr_map["score"]["teamTwo"]["ct"]
-            + curr_map["score"]["teamTwo"]["t"]
-            + curr_map["score"]["teamTwo"]["ot"]
-        )
-        if winner_score == loser_score:
-            winner = 0.5
-        w["winner"] = winner
+        w["ranking_team_one"] = ranking_one if winner == 1 else ranking_two
+        w["ranking_team_two"] = ranking_two if winner == 1 else ranking_one
 
-    return w
+        team_one_ages = [default_birth_year - min_birth_year]
+        team_two_ages = [default_birth_year - min_birth_year]
+
+        picked_by = curr_map.get("pickedBy", "") if played else map_info["picked_by"]
+
+        w["map_pick_team_one"] = picked_by == ("teamOne" if winner == 1 else "teamTwo")
+        w["map_pick_team_two"] = picked_by == ("teamTwo" if winner == 1 else "teamOne")
+
+        w["map_num"] = curr_map.get("mapNum", 0) if played else map_info["map_num"]
+
+        for player in (
+            curr_map["players_info"]
+            if played
+            else curr_map["players_info_first"] + curr_map["players_info_second"]
+        ):
+            if player["birthYear"] != None:
+                adjusted_birth_year = player["birthYear"] - min_birth_year
+                if str(player["hltvId"]) in team_one_ids:
+                    team_one_ages.append(adjusted_birth_year)
+                elif str(player["hltvId"]) in team_two_ids:
+                    team_two_ages.append(adjusted_birth_year)
+
+        w["age_avg_team_one"] = np.mean(team_one_ages)
+        w["age_avg_team_two"] = np.mean(team_two_ages)
+
+        w |= get_map_vector(map_name)
+
+        performances = list(
+            maps.aggregate(
+                [
+                    {
+                        "$lookup": {
+                            "from": "matches",
+                            "localField": "matchId",
+                            "foreignField": "hltvId",
+                            "as": "match",
+                        }
+                    },
+                    {
+                        "$lookup": {
+                            "from": "events",
+                            "localField": "match.0.eventId",
+                            "foreignField": "hltvId",
+                            "as": "event",
+                        }
+                    },
+                    {
+                        "$match": {
+                            "$and": [
+                                {"date": {"$lt": raw_date}},
+                                {"date": {"$gte": raw_date - max_threshold}},
+                                {
+                                    "players": {
+                                        "$in": [
+                                            int(pid)
+                                            for pid in team_one_ids + team_two_ids
+                                        ]
+                                    }
+                                },
+                            ]
+                        }
+                    },
+                    {"$sort": {"date": -1}},
+                ]
+            )
+        )
+        condition_dict = {
+            matchup_category: matchup_condition(team_one_ids, team_two_ids),
+            "map": map_condition(map_name),
+            "online": online_condition(online),
+            "event": event_condition(related_event["hltvId"]),
+            "rank": rank_condition(team_one_ids, ranking_one, ranking_two),
+        }
+
+        results_data = generate_round_rating_stats(
+            team_one_ids, team_two_ids, performances, condition_dict, raw_date
+        )
+        w |= results_data
+
+        w["map_id"] = curr_map["hltvId"]
+        if played:
+            winner_score = (
+                curr_map["score"]["teamOne"]["ct"]
+                + curr_map["score"]["teamOne"]["t"]
+                + curr_map["score"]["teamOne"]["ot"]
+            )
+            loser_score = (
+                curr_map["score"]["teamTwo"]["ct"]
+                + curr_map["score"]["teamTwo"]["t"]
+                + curr_map["score"]["teamTwo"]["ot"]
+            )
+            if winner_score == loser_score:
+                winner = 0.5
+            w["winner"] = winner
+            return w
+    except Exception as e:
+        return None
 
 
 def process_maps(maps_to_process, frame_lock, feature_data, thread_idx):
-    print(f"New map processor started: [{thread_idx}]")
-    for map_idx in range(len(maps_to_process)):
+    # print(f"New map processor started: [{thread_idx}]")
+    for map_idx in tqdm(
+        range(len(maps_to_process)), desc=f"Map Processor [{thread_idx}]", ncols=150
+    ):
         curr_map = maps_to_process[map_idx]
-        print(f"[{thread_idx}] Processing map ID:", curr_map["hltvId"])
+        # print(f"[{thread_idx}] Processing map ID:", curr_map["hltvId"])
         w = generate_data_point(curr_map)
         if w == None or len(w.keys()) != feature_data.frame.shape[1]:
-            print("Partial datapoint for map id", curr_map["hltvId"])
+            # print("Partial datapoint for map id", curr_map["hltvId"])
             continue
 
         with frame_lock:

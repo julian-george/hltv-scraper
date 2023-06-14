@@ -145,11 +145,11 @@ num_maps = maps.count_documents(
     {"hltvId": {"$not": {"$in": list(feature_data.history or [])}}}
 )
 
-thread_num = 8
+thread_num = 16
 
 slice_size = np.ceil(num_maps / thread_num)
 
-print(f"Processing {num_maps} in {thread_num} slices of {slice_size}")
+print(f"Processing {num_maps} maps in {thread_num} slices of {slice_size}")
 
 frame_lock = threading.Lock()
 history_lock = threading.Lock()
@@ -165,7 +165,7 @@ for i in range(thread_num):
                     }
                 },
                 {"$sort": {"hltvId": -1}},
-                {"$skip": 20000},
+                {"$skip": slice_size * i},
                 {"$limit": slice_size},
                 {
                     "$lookup": {
