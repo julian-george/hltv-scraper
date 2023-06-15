@@ -444,7 +444,9 @@ def generate_data_point(curr_map, played=True, map_info=None):
             if played
             else [str(pid) for pid in curr_map["players"]["secondTeam"]]
         )
+        print(team_one_ids, team_two_ids)
         if len(team_one_ids) != 5 or len(team_two_ids) != 5:
+            print("E")
             return None
         online = related_match["online"] if played else curr_map["online"]
         w["online_bool"] = online
@@ -574,7 +576,7 @@ def generate_data_point(curr_map, played=True, map_info=None):
             if winner_score == loser_score:
                 winner = 0.5
             w["winner"] = winner
-            return w
+        return w
     except Exception as e:
         return None
 

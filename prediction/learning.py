@@ -114,12 +114,11 @@ for i in range(num_test_sets):
     X_train, X_test, y_train, y_test = train_test_split(
         X_train, y_train, test_size=245, shuffle=False
     )
-    print(X_test[0, date_column])
     test_sets.append(
         (
             X_test[:, :-1],
             y_test,
-            datetime.fromtimestamp(X_test[0, date_column] * 360000),
+            datetime.fromtimestamp(X_test[0, date_column]),
         )
     )
 

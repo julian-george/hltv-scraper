@@ -113,6 +113,7 @@ def generate_prediction(match, map_list, same_order=True, ignore_cache=False):
     map_predictions = {}
     for i, map_info in enumerate(map_list):
         w = generate_data_point(match, played=False, map_info=map_info)
+        print(w, match)
         processed_w = process_frame(pd.DataFrame([w]))[0]
         # with open("t.txt", "w") as f:
         #     f.write("\n".join(sorted(list(processed_w.columns))))
@@ -203,13 +204,24 @@ if __name__ == "__main__":
             print(title)
             for map_name, odds in pred.items():
                 print("\t", map_name, odds)
-    elif len(sys.argv) == 3:
-        prediction = predict_match(sys.argv[1], sys.argv[2])
-        if prediction[1] == None:
+    else:
+        team_names = []
+        if len(sys.argv) == 2:
+            match = unplayed_matches.find_one({"hltvId": int(sys.argv[1])})
+            print(sys.argv[1])
+            team_names = match["title"].split(" vs. ")
+
+        elif len(sys.argv) == 3:
+            match = get_match_by_team_names(sys.argv[1], sys.argv[2])
+            team_names = [sys.argv[1], sys.argv[2]]
+        prediction = predict_match(
+            match, team_names[0], team_names[1], default_map_infos
+        )
+        if prediction == None:
             print("No such match found")
         else:
             print(sys.argv[1], "vs.", sys.argv[2])
-            for map_name, odds in prediction[0].items():
+            for map_name, odds in prediction.items():
                 print("\t", map_name, odds)
 
 

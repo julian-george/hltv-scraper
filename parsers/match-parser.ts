@@ -141,11 +141,23 @@ export const parseMatch = async (
       );
     }
     for (const picElement of teamOnePics) {
-      players.firstTeam.push(Number(picElement.attribs["data-player-id"]));
+      const currId = Number(picElement.attribs["data-player-id"]);
+      if (!currId) {
+        throw new Error(
+          `Undefined player for team one of unplayed match ${matchId}`
+        );
+      }
+      players.firstTeam.push(currId);
     }
 
     for (const picElement of teamTwoPics) {
-      players.secondTeam.push(Number(picElement.attribs["data-player-id"]));
+      const currId = Number(picElement.attribs["data-player-id"]);
+      if (!currId) {
+        throw new Error(
+          `Undefined player for team two of unplayed match ${matchId}`
+        );
+      }
+      players.secondTeam.push(currId);
     }
   }
 
