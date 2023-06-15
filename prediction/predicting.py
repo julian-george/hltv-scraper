@@ -113,7 +113,6 @@ def generate_prediction(match, map_list, same_order=True, ignore_cache=False):
     map_predictions = {}
     for i, map_info in enumerate(map_list):
         w = generate_data_point(match, played=False, map_info=map_info)
-        print(w, match)
         processed_w = process_frame(pd.DataFrame([w]))[0]
         # with open("t.txt", "w") as f:
         #     f.write("\n".join(sorted(list(processed_w.columns))))
@@ -126,6 +125,15 @@ def generate_prediction(match, map_list, same_order=True, ignore_cache=False):
         if not same_order:
             map_predictions[map_name].reverse()
     return map_predictions
+
+
+def get_match_by_id(id):
+    match_cursor = unplayed_matches.aggregate(
+        [{"$match": {"hltvId": int(id)}}] + aggregate_list
+    )
+    if not match_cursor._has_next():
+        return None
+    return match_cursor.next()
 
 
 def get_match_by_team_names(team_one_name, team_two_name):
@@ -207,20 +215,19 @@ if __name__ == "__main__":
     else:
         team_names = []
         if len(sys.argv) == 2:
-            match = unplayed_matches.find_one({"hltvId": int(sys.argv[1])})
-            print(sys.argv[1])
+            match = get_match_by_id(sys.argv[1])
             team_names = match["title"].split(" vs. ")
 
         elif len(sys.argv) == 3:
             match = get_match_by_team_names(sys.argv[1], sys.argv[2])
             team_names = [sys.argv[1], sys.argv[2]]
         prediction = predict_match(
-            match, team_names[0], team_names[1], default_map_infos
+            match, team_names[0], team_names[1], match["mapInfos"] or default_map_infos
         )
         if prediction == None:
             print("No such match found")
         else:
-            print(sys.argv[1], "vs.", sys.argv[2])
+            print(team_names[0], "vs.", team_names[1])
             for map_name, odds in prediction.items():
                 print("\t", map_name, odds)
 

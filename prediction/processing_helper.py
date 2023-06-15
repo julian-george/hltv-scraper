@@ -3,6 +3,7 @@ import os
 from dotenv import load_dotenv
 import numpy as np
 import pandas as pd
+import traceback
 from datetime import timedelta
 from tqdm import tqdm
 
@@ -444,9 +445,7 @@ def generate_data_point(curr_map, played=True, map_info=None):
             if played
             else [str(pid) for pid in curr_map["players"]["secondTeam"]]
         )
-        print(team_one_ids, team_two_ids)
         if len(team_one_ids) != 5 or len(team_two_ids) != 5:
-            print("E")
             return None
         online = related_match["online"] if played else curr_map["online"]
         w["online_bool"] = online
@@ -578,6 +577,7 @@ def generate_data_point(curr_map, played=True, map_info=None):
             w["winner"] = winner
         return w
     except Exception as e:
+        print(traceback.format_exc())
         return None
 
 
