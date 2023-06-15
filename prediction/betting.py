@@ -65,12 +65,13 @@ def close_bets(browser):
 
 
 def balance_check(browser):
-    assert (
-        float(
-            browser.find_element(By.CSS_SELECTOR, "div.wallet-select__value>span").text
-        )
-        > 0
+    temp_balance = float(
+        browser.find_element(By.CSS_SELECTOR, "div.wallet-select__value>span").text
     )
+    if temp_balance > 0.0:
+        return temp_balance
+    else:
+        raise StaleElementReferenceException
 
 
 def market_bet(prediction, market_element, bet_browser):
@@ -110,6 +111,8 @@ def market_bet(prediction, market_element, bet_browser):
             bet_browser, 10, ignored_exceptions=ignored_exceptions
         )
         balance_wait.until(balance_check)
+        # this waits for the stupid aniamtion to finish
+        sleep(0.5)
         total_balance = float(
             bet_browser.find_element(
                 By.CSS_SELECTOR, "div.wallet-select__value>span"
@@ -296,6 +299,7 @@ def make_bets(browser=None):
     )
     balance_wait = WebDriverWait(browser, 20, ignored_exceptions=ignored_exceptions)
     balance_wait.until(balance_check)
+    sleep(0.5)
     total_balance = float(
         browser.find_element(By.CSS_SELECTOR, "div.wallet-select__value>span").text
     )
