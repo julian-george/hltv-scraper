@@ -21,7 +21,7 @@ from pyvirtualdisplay import Display
 from predicting import predict_match, confirm_bet, set_maps, get_match_by_team_names
 
 
-ignored_exceptions = [StaleElementReferenceException]
+ignored_exceptions = [StaleElementReferenceException, AssertionError]
 
 prediction_threshold = timedelta(minutes=10)
 bet_percent = 0.02
@@ -64,6 +64,15 @@ def close_bets(browser):
         button.click()
 
 
+def balance_check(browser):
+    assert (
+        float(
+            browser.find_element(By.CSS_SELECTOR, "div.wallet-select__value>span").text
+        )
+        > 0
+    )
+
+
 def market_bet(prediction, market_element, bet_browser):
     page_home_odds = None
     page_away_odds = None
@@ -97,6 +106,10 @@ def market_bet(prediction, market_element, bet_browser):
                 )
             ).text
         )
+        balance_wait = WebDriverWait(
+            bet_browser, 10, ignored_exceptions=ignored_exceptions
+        )
+        balance_wait.until(balance_check)
         total_balance = float(
             bet_browser.find_element(
                 By.CSS_SELECTOR, "div.wallet-select__value>span"
@@ -281,15 +294,10 @@ def make_bets(browser=None):
             EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.match-group"))
         )
     )
-    sleep(1)
+    balance_wait = WebDriverWait(browser, 20, ignored_exceptions=ignored_exceptions)
+    balance_wait.until(balance_check)
     total_balance = float(
-        WebDriverWait(browser, 10, ignored_exceptions=ignored_exceptions)
-        .until(
-            EC.presence_of_element_located(
-                (By.CSS_SELECTOR, "div.wallet-select__value>span")
-            )
-        )
-        .text
+        browser.find_element(By.CSS_SELECTOR, "div.wallet-select__value>span").text
     )
 
     print(f"[{str(datetime.now())}] Current Balance: $" + str(total_balance))

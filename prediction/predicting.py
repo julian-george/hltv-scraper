@@ -107,6 +107,7 @@ def generate_prediction(match, map_list, same_order=True, ignore_cache=False):
             and not None in cached_predictions.values()
             and cached_predictions != {}
         ):
+            print("Returning cached predictions...")
             return cached_predictions
     print("Generating new predictions...")
     model = tf.keras.models.load_model(model_name)
