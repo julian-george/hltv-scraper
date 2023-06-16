@@ -24,8 +24,8 @@ from predicting import predict_match, confirm_bet, set_maps, get_match_by_team_n
 ignored_exceptions = [StaleElementReferenceException, AssertionError]
 
 prediction_threshold = timedelta(minutes=10)
-bet_percent = 0.02
-small_bet_percent = 0.005
+bet_percent = 0.05
+small_bet_percent = 0.01
 
 min_bet_amount = 1.1
 max_bet_amount = 2000
