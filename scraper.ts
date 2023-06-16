@@ -32,18 +32,7 @@ export const scrapeResults = async ($: CheerioAPI, resultsUrl: string) => {
     const resultUrl = resultLink.attribs["href"];
     const matchId = Number(resultUrl.split("/")[2]);
     const match = await getMatchByHltvId(matchId);
-    if (
-      !CACHED &&
-      match &&
-      !TRAVERSE_ADDED_MATCHES &&
-      // Temporary thing as we update with these two new features
-      (!OVERWRITE_RESULTS_MATCHES ||
-        (await ifMapExists({
-          matchId,
-          pickedBy: { $exists: true },
-          numMaps: { $exists: true },
-        })))
-    ) {
+    if (!CACHED && match && !TRAVERSE_ADDED_MATCHES) {
       if (FINISH_UPON_DUPLICATE) {
         console.log("Match ID " + matchId + " already in database, finishing.");
         finished = true;

@@ -48,7 +48,7 @@ def login(browser):
     browser.get("https://thunderpick.io/en/esports?login=true")
     google_ele = browser.find_element(By.CSS_SELECTOR, ".social-btn--google")
     google_ele.click()
-    sleep(2)
+    sleep(1)
 
 
 urls_to_skip = []
@@ -287,7 +287,7 @@ def make_bets(browser=None):
     except:
         print("Trying to log in...")
         login(browser)
-        browser.implicitly_wait(15)
+        browser.get("https://thunderpick.io/en/esports/csgo")
 
     now = datetime.now()
     current_year = str(datetime.now().year)
@@ -370,7 +370,7 @@ def make_bets(browser=None):
             )
             .text
         )
-        match = get_match_by_team_names(home_team, away_team)
+        (match, same_order) = get_match_by_team_names(home_team, away_team)
         # if this match isnt in the database or it has been fully bet on, skip
         if match == None:
             print("No match found for", home_team, away_team)
@@ -402,11 +402,11 @@ def make_bets(browser=None):
                 map_name = holder.find_element(By.CSS_SELECTOR, "div.mapname").text
                 picked_by = None
                 left_picked = (
-                    len(holder.find_elements(By.CSS_SELECTOR, "div.results-left.pick"))
+                    len(holder.find_elements(By.CSS_SELECTOR, ".results-left.pick"))
                     == 1
                 )
                 right_picked = (
-                    len(holder.find_elements(By.CSS_SELECTOR, "div.results-right.pick"))
+                    len(holder.find_elements(By.CSS_SELECTOR, ".results-right.pick"))
                     == 1
                 )
                 if left_picked:
@@ -426,7 +426,7 @@ def make_bets(browser=None):
             print("Maps still TBA")
             sleep_length = 30
             continue
-        predictions = predict_match(match, home_team, away_team, map_infos)
+        predictions = predict_match(match, map_infos, same_order)
         if len(map_names) == 1:
             market_prediction_dict["Match"] = predictions[map_names[0]]
         else:

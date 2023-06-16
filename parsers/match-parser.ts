@@ -214,9 +214,6 @@ export const parseMatch = async (
               console.log(
                 "Map ID " + mapId + " already in database, skipping."
               );
-              // Having this in here for the time being
-              updatePick(mapId, picks[mapId]);
-              updateMapNum(mapId, i);
               resolve(true);
               return true;
             }

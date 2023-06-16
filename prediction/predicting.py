@@ -99,7 +99,15 @@ def cache_predictions(matchId, prediction_dict):
     )
 
 
-def generate_prediction(match, map_list, same_order=True, ignore_cache=False):
+default_map_infos = [
+    {"map_name": map_name, "picked_by": None, "map_num": 0} for map_name in map_types
+]
+
+
+def generate_prediction(match, map_infos=None, same_order=True, ignore_cache=False):
+    if map_infos == None:
+        print("No map infos provided, using default.")
+        map_infos = default_map_infos
     if not ignore_cache:
         cached_predictions = get_cached_predictions(match["hltvId"], same_order)
         if (
@@ -112,12 +120,12 @@ def generate_prediction(match, map_list, same_order=True, ignore_cache=False):
     print("Generating new predictions...")
     model = tf.keras.models.load_model(model_name)
     map_predictions = {}
-    for i, map_info in enumerate(map_list):
+    for i, map_info in enumerate(map_infos):
         w = generate_data_point(match, played=False, map_info=map_info)
         processed_w = process_frame(pd.DataFrame([w]))[0]
         # with open("t.txt", "w") as f:
         #     f.write("\n".join(sorted(list(processed_w.columns))))
-        processed_w.to_csv("test.csv")
+        processed_w.to_csv(f"w_{i}_unplayed.csv")
         processed_w = processed_w.to_numpy()
         prediction = list(model.predict(processed_w, verbose=False)[0])
         map_predictions[map_info["map_name"]] = prediction
@@ -151,22 +159,15 @@ def get_match_by_team_names(team_one_name, team_two_name):
     match_cursor = unplayed_matches.aggregate([regex_query] + aggregate_list)
     if not match_cursor._has_next():
         return None
-    return match_cursor.next()
-
-
-def predict_match(match, team_one_name, team_two_name, map_infos):
-    team_one_name = trim_team_name(team_one_name)
-    team_two_name = trim_team_name(team_two_name)
-    same_order = match["title"].index(team_one_name) < match["title"].index(
+    match = match_cursor.next()
+    return match, match["title"].index(team_one_name) < match["title"].index(
         team_two_name
     )
+
+
+def predict_match(match, map_infos, same_order=True):
     map_predictions = generate_prediction(match, map_infos, same_order)
     return map_predictions
-
-
-default_map_infos = [
-    {"map_name": map_name, "picked_by": None, "map_num": 0} for map_name in map_types
-]
 
 
 def maps_to_examine():
@@ -201,7 +202,7 @@ def predict_all_matches():
     print("Predicting", len(all_unplayed), "matches...")
     predictions = {}
     for match in all_unplayed:
-        predictions[match["title"]] = generate_prediction(match, default_map_infos)
+        predictions[match["title"]] = generate_prediction(match)
     return predictions
 
 
@@ -222,9 +223,7 @@ if __name__ == "__main__":
         elif len(sys.argv) == 3:
             match = get_match_by_team_names(sys.argv[1], sys.argv[2])
             team_names = [sys.argv[1], sys.argv[2]]
-        prediction = predict_match(
-            match, team_names[0], team_names[1], match["mapInfos"] or default_map_infos
-        )
+        prediction = predict_match(match, match["mapInfos"] or default_map_infos)
         if prediction == None:
             print("No such match found")
         else:

@@ -577,6 +577,7 @@ def generate_data_point(curr_map, played=True, map_info=None):
             w["winner"] = winner
         return w
     except Exception as e:
+        print("Unable to process map id", curr_map["hltvId"])
         print(traceback.format_exc())
         return None
 
