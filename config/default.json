@@ -3,7 +3,7 @@
   "onlyScrapePlayed": false,
   "results": {
     "offset": 0,
-    "finishUponDuplicate": false,
+    "finishUponDuplicate": true,
     "traverseAdded": false,
     "overwriteMatches": false
   },
