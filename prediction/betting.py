@@ -27,6 +27,9 @@ prediction_threshold = timedelta(minutes=10)
 bet_percent = 0.02
 small_bet_percent = 0.005
 
+min_bet_amount = 1.1
+max_bet_amount = 2000
+
 total_balance = None
 
 
@@ -167,7 +170,10 @@ def market_bet(prediction, market_element, bet_browser):
             )
             else small_bet_percent
         )
-        amount_to_bet = max(total_balance * bet_percent, 1.1)
+        # bets either the calculated percentage amount or the min/max
+        amount_to_bet = min(
+            max(total_balance * bet_percent, min_bet_amount), max_bet_amount
+        )
         pending_bet_input.send_keys(amount_to_bet)
         submit_button = bet_browser.find_element(
             By.CLASS_NAME, "bet-slip__floating-button"
@@ -446,6 +452,7 @@ def make_bets(browser=None):
         # map_threads.append(
         #     map_pool.apply_async(match_bet, (market_prediction_dict, bet_url)).get()
         # )
+        print("Trying to bet on", match["title"])
         betted_markets = match_bet(
             market_prediction_dict, bet_url, match["numMaps"], browser
         )
