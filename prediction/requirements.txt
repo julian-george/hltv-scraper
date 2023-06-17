@@ -2,7 +2,6 @@ pymongo
 tensorflow-cpu
 webdriver_manager
 selenium
-pyvirtualdisplay
 numpy
 pandas
 scikit-learn
