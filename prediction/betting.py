@@ -18,7 +18,12 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.core.utils import ChromeType
 from pyvirtualdisplay import Display
 
-from predicting import predict_match, confirm_bet, set_maps, get_match_by_team_names
+from predicting import (
+    predict_match,
+    confirm_bet,
+    set_maps,
+    get_unplayed_match_by_team_names,
+)
 
 
 ignored_exceptions = [StaleElementReferenceException, AssertionError]
@@ -47,11 +52,18 @@ options.add_argument("--disable-extensions")
 options.add_argument("--start-fullscreen")
 
 
+def generic_wait(browser):
+    return WebDriverWait(browser, 10, ignored_exceptions=ignored_exceptions)
+
+
 def login(browser):
     browser.get("https://thunderpick.io/en/esports?login=true")
     google_ele = browser.find_element(By.CSS_SELECTOR, ".social-btn--google")
     google_ele.click()
     sleep(1)
+    generic_wait(browser).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, "div.match-group"))
+    )
 
 
 urls_to_skip = []
@@ -110,10 +122,7 @@ def market_bet(prediction, market_element, bet_browser):
                 )
             ).text
         )
-        balance_wait = WebDriverWait(
-            bet_browser, 10, ignored_exceptions=ignored_exceptions
-        )
-        balance_wait.until(balance_check)
+        generic_wait(bet_browser).until(balance_check)
         # this waits for the stupid aniamtion to finish
         sleep(0.5)
         total_balance = float(
@@ -211,16 +220,14 @@ def match_bet(predictions_dict, bet_url, num_maps, bet_browser=None):
     market_elements = []
     if num_maps == 1:
         market_elements.append(
-            WebDriverWait(bet_browser, 10, ignored_exceptions=ignored_exceptions).until(
+            generic_wait(bet_browser).until(
                 EC.presence_of_element_located((By.CLASS_NAME, "main-market"))
             )
         )
     else:
         try:
             market_elements = list(
-                WebDriverWait(
-                    bet_browser, 10, ignored_exceptions=ignored_exceptions
-                ).until(
+                generic_wait(bet_browser).until(
                     EC.presence_of_all_elements_located(
                         (
                             By.CSS_SELECTOR,
@@ -287,9 +294,9 @@ def make_bets(browser=None):
     browser.get("https://thunderpick.io/en/esports/csgo")
     # if this doesn't exist, we aren't signed in
     try:
-        user_element = WebDriverWait(
-            browser, 10, ignored_exceptions=ignored_exceptions
-        ).until(EC.presence_of_element_located((By.CLASS_NAME, "user-summary")))
+        user_element = generic_wait(browser).until(
+            EC.presence_of_element_located((By.CLASS_NAME, "user-summary"))
+        )
     except:
         print("Trying to log in...")
         login(browser)
@@ -299,12 +306,11 @@ def make_bets(browser=None):
     current_year = str(datetime.now().year)
 
     match_sections = list(
-        WebDriverWait(browser, 10, ignored_exceptions=ignored_exceptions).until(
+        generic_wait(browser).until(
             EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.match-group"))
         )
     )
-    balance_wait = WebDriverWait(browser, 20, ignored_exceptions=ignored_exceptions)
-    balance_wait.until(balance_check)
+    generic_wait(browser).until(balance_check)
     sleep(0.5)
     total_balance = float(
         browser.find_element(By.CSS_SELECTOR, "div.wallet-select__value>span").text
@@ -315,10 +321,13 @@ def make_bets(browser=None):
     match_urls = []
 
     for match_section in match_sections:
-        title_wait = WebDriverWait(browser, 10, ignored_exceptions=ignored_exceptions)
-        title = title_wait.until(
-            lambda _: match_section.find_element(By.CLASS_NAME, "match-group-title")
-        ).text
+        title = (
+            generic_wait(browser)
+            .until(
+                lambda _: match_section.find_element(By.CLASS_NAME, "match-group-title")
+            )
+            .text
+        )
         if title != "Featured":
             match_urls += list(
                 map(
@@ -339,7 +348,7 @@ def make_bets(browser=None):
         match_date = None
         try:
             match_date = (
-                WebDriverWait(browser, 10, ignored_exceptions=ignored_exceptions)
+                generic_wait(browser)
                 .until(
                     EC.presence_of_element_located(
                         (By.CLASS_NAME, "match-header__date")
@@ -359,7 +368,7 @@ def make_bets(browser=None):
             # browser.close()
             return sleep_length
         home_team = (
-            WebDriverWait(browser, 10, ignored_exceptions=ignored_exceptions)
+            generic_wait(browser)
             .until(
                 EC.presence_of_element_located(
                     (By.CSS_SELECTOR, "div.main-market__home-team")
@@ -368,7 +377,7 @@ def make_bets(browser=None):
             .text
         )
         away_team = (
-            WebDriverWait(browser, 10, ignored_exceptions=ignored_exceptions)
+            generic_wait(browser)
             .until(
                 EC.presence_of_element_located(
                     (By.CSS_SELECTOR, "div.main-market__away-team")
@@ -376,7 +385,9 @@ def make_bets(browser=None):
             )
             .text
         )
-        (match, same_order) = get_match_by_team_names(home_team, away_team)
+        (match, same_order) = get_unplayed_match_by_team_names(
+            home_team, away_team, datetime.now()
+        )
         # if this match isnt in the database or it has been fully bet on, skip
         if match == None:
             print("No match found for", home_team, away_team)
@@ -400,7 +411,7 @@ def make_bets(browser=None):
             # do this for edge case that only one map is TBA to prevent adding duplicate maps
             map_infos = []
             browser.get("https://www.hltv.org" + match["matchUrl"])
-            WebDriverWait(browser, 10, ignored_exceptions=ignored_exceptions).until(
+            generic_wait(browser).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "div.mapholder"))
             )
             mapholders = browser.find_elements(By.CSS_SELECTOR, "div.mapholder")

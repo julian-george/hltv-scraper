@@ -14,6 +14,13 @@ export const deleteUnplayedMatchByHltvId = async (id: number) => {
   return match;
 };
 
+export const updateUnplayedMatch = async (id: number, updates) => {
+  const match = await queryWrapper(() =>
+    UnplayedMatch.findOneAndUpdate({ hltvId: id }, updates)
+  );
+  return match;
+};
+
 export const createUnplayedMatch = async (match) => {
   return await insertWrapper(() =>
     UnplayedMatch.findOneAndUpdate({ hltvId: match.hltvId }, match, {

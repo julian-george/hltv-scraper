@@ -12,6 +12,7 @@ import { createMatch, getMatchByHltvId } from "../services/match-service.js";
 import {
   createUnplayedMatch,
   deleteUnplayedMatchByHltvId,
+  updateUnplayedMatch,
 } from "../services/unplayedmatch-service.js";
 import puppeteerGet from "../scrape-client.js";
 import formatProcessor from "../processors/match-format.js";
@@ -319,6 +320,7 @@ export const parseMatch = async (
       const foundMatch = await getMatchByHltvId(hltvId);
       if (foundMatch) return foundMatch;
     }
+    await updateUnplayedMatch(hltvId, { played: true });
     // await deleteUnplayedMatchByHltvId(hltvId);
     try {
       return await createMatch({

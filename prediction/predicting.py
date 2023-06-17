@@ -4,6 +4,9 @@ import sys
 import pandas as pd
 import tensorflow as tf
 import os
+import jellyfish
+from fuzzywuzzy import fuzz
+from datetime import timedelta, datetime
 from processing_helper import generate_data_point
 from learning_helper import process_frame
 
@@ -19,7 +22,7 @@ model_name = "prediction_model"
 
 # conditions to be added to aggregation pipeline
 aggregate_list = [
-    # {"$match": {"betted": {"$size": 0}}},
+    {"$match": {"played": {"$ne": True}}},
     {
         "$lookup": {
             "from": "events",
@@ -57,26 +60,6 @@ map_types = [
     "Overpass",
     "Vertigo",
 ]
-
-
-def trim_team_name(team_name):
-    team_name = team_name.replace("GG", "").lower()
-    team_name = (
-        team_name.replace("gaming", "")
-        .replace("team", "")
-        .replace("esports", "")
-        .replace("esport", "")
-        .replace("e-sports", "")
-    )
-    if team_name[-1] == ".":
-        team_name = team_name[:-1]
-    split_team_name = team_name.split(" ")
-    if split_team_name[0] == "the":
-        split_team_name.pop(0)
-    team_name = " ".join(split_team_name)
-    team_name = re.sub(" +", " ", team_name).strip()
-    team_name = team_name
-    return team_name
 
 
 def get_cached_predictions(matchId, same_order):
@@ -145,24 +128,30 @@ def get_match_by_id(id):
     return match_cursor.next()
 
 
-def get_match_by_team_names(team_one_name, team_two_name):
-    team_one_name = trim_team_name(team_one_name)
-    team_two_name = trim_team_name(team_two_name)
-    regex_query = {
-        "$match": {
-            "$and": [
-                {"title": {"$regex": team_one_name}},
-                {"title": {"$regex": team_two_name}},
-            ]
-        }
-    }
-    match_cursor = unplayed_matches.aggregate([regex_query] + aggregate_list)
-    if not match_cursor._has_next():
-        return None
-    match = match_cursor.next()
-    return match, match["title"].index(team_one_name) < match["title"].index(
-        team_two_name
-    )
+unplayed_threshold = timedelta(days=0, hours=7, minutes=0)
+threshold_similarity = 0.6
+
+
+def get_unplayed_match_by_team_names(team_one_name, team_two_name, date=None):
+    draft_title = f"{team_one_name} vs. {team_two_name}"
+    all_unplayed = list(unplayed_matches.aggregate(aggregate_list))
+    best_match = None
+    best_similarity = 0
+
+    for unplayed in all_unplayed:
+        curr_similarity = fuzz.partial_token_sort_ratio(unplayed["title"], draft_title)
+        if curr_similarity > best_similarity and curr_similarity > threshold_similarity:
+            if date == None or abs(date - unplayed["date"]) < unplayed_threshold:
+                best_match = unplayed
+                best_similarity = curr_similarity
+    if best_match == None:
+        return None, True
+    team_names = best_match["title"].split(" vs. ")
+    same_order = jellyfish.jaro_similarity(
+        team_one_name, team_names[0]
+    ) > jellyfish.jaro_similarity(team_one_name, team_names[1])
+    print("bestsimilarity", best_similarity)
+    return best_match, same_order
 
 
 def predict_match(match, map_infos, same_order=True):
@@ -216,14 +205,19 @@ if __name__ == "__main__":
                 print("\t", map_name, odds)
     else:
         team_names = []
+        same_order = True
         if len(sys.argv) == 2:
             match = get_match_by_id(sys.argv[1])
             team_names = match["title"].split(" vs. ")
 
         elif len(sys.argv) == 3:
-            match = get_match_by_team_names(sys.argv[1], sys.argv[2])
+            match, same_order = get_unplayed_match_by_team_names(
+                sys.argv[1], sys.argv[2]
+            )
             team_names = [sys.argv[1], sys.argv[2]]
-        prediction = predict_match(match, match["mapInfos"] or default_map_infos)
+        prediction = predict_match(
+            match, match["mapInfos"] or default_map_infos, same_order
+        )
         if prediction == None:
             print("No such match found")
         else:
@@ -242,3 +236,4 @@ def confirm_bet(matchId, betted_markets):
     unplayed_matches.update_one(
         {"hltvId": matchId}, {"$set": {"betted": betted_markets}}
     )
+    return betted_markets
