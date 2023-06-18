@@ -8,4 +8,3 @@ scikit-learn
 undetected-chromedriver
 tdqm
 jellyfish
-fuzzywuzzy

@@ -1,11 +1,9 @@
 import pymongo
-import re
 import sys
 import pandas as pd
 import tensorflow as tf
 import os
 import jellyfish
-from fuzzywuzzy import fuzz
 from datetime import timedelta, datetime
 from processing_helper import generate_data_point
 from learning_helper import process_frame
@@ -128,11 +126,12 @@ def get_match_by_id(id):
 
 
 unplayed_threshold = timedelta(days=0, hours=7, minutes=0)
-threshold_similarity = 0.6
+threshold_similarity = 0.7
 
 
 def get_unplayed_match_by_team_names(team_one_name, team_two_name, date=None):
-    draft_title = f"{team_one_name} vs. {team_two_name}"
+    draft_title_1 = f"{team_one_name} vs. {team_two_name}"
+    draft_title_2 = f"{team_two_name} vs. {team_one_name}"
     all_unplayed = list(
         unplayed_matches.aggregate(
             [
@@ -145,7 +144,10 @@ def get_unplayed_match_by_team_names(team_one_name, team_two_name, date=None):
     best_similarity = 0
 
     for unplayed in all_unplayed:
-        curr_similarity = fuzz.partial_token_sort_ratio(unplayed["title"], draft_title)
+        curr_similarity = max(
+            jellyfish.jaro_similarity(unplayed["title"], draft_title_1),
+            jellyfish.jaro_similarity(unplayed["title"], draft_title_2),
+        )
         if curr_similarity > best_similarity and curr_similarity > threshold_similarity:
             if date == None or abs(date - unplayed["date"]) < unplayed_threshold:
                 best_match = unplayed
