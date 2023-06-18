@@ -80,9 +80,11 @@ def close_bets(browser):
 
 
 def balance_check(browser):
-    temp_balance = float(
-        browser.find_element(By.CSS_SELECTOR, "div.wallet-select__value>span").text
-    )
+    correct_currency = browser.find_element(By.CSS_SELECTOR, "i.ft-currency-usd")
+    temp_balance = browser.find_element(
+        By.CSS_SELECTOR, "div.wallet-select__value>span"
+    ).text.replace(",", "")
+    temp_balance = float(temp_balance)
     if temp_balance > 0.0:
         return temp_balance
     else:

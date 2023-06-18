@@ -22,7 +22,6 @@ model_name = "prediction_model"
 
 # conditions to be added to aggregation pipeline
 aggregate_list = [
-    {"$match": {"played": {"$ne": True}}},
     {
         "$lookup": {
             "from": "events",
@@ -134,7 +133,14 @@ threshold_similarity = 0.6
 
 def get_unplayed_match_by_team_names(team_one_name, team_two_name, date=None):
     draft_title = f"{team_one_name} vs. {team_two_name}"
-    all_unplayed = list(unplayed_matches.aggregate(aggregate_list))
+    all_unplayed = list(
+        unplayed_matches.aggregate(
+            [
+                {"$match": {"played": {"$ne": True}}},
+            ]
+            + aggregate_list
+        )
+    )
     best_match = None
     best_similarity = 0
 
@@ -183,7 +189,14 @@ def match_ids_to_examine():
 
 
 def predict_all_matches():
-    all_matches = list(unplayed_matches.aggregate(aggregate_list))
+    all_matches = list(
+        unplayed_matches.aggregate(
+            [
+                {"$match": {"played": {"$ne": True}}},
+            ]
+            + aggregate_list
+        )
+    )
     played_match_ids = match_ids_to_examine()
     all_unplayed = [
         match for match in all_matches if not match["hltvId"] in played_match_ids
