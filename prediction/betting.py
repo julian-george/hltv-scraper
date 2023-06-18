@@ -192,12 +192,10 @@ def market_bet(prediction, market_element, bet_browser):
         submit_button.click()
         sleep(1)
         WebDriverWait(bet_browser, 20, ignored_exceptions=ignored_exceptions).until(
-            EC.none_of(
-                EC.presence_of_element_located(
-                    (
-                        By.CSS_SELECTOR,
-                        "div.selections-list input.thp-input",
-                    )
+            EC.presence_of_element_located(
+                (
+                    By.CSS_SELECTOR,
+                    "div.bet-slip-info--bet-accepted",
                 )
             )
         )
