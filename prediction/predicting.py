@@ -113,6 +113,7 @@ def generate_prediction(match, map_infos=None, same_order=True, ignore_cache=Fal
     for map_name, predictions in map_predictions.items():
         if not same_order:
             map_predictions[map_name].reverse()
+        map_predictions[map_name] = [round(prediction, 3) for prediction in predictions]
     return map_predictions
 
 
