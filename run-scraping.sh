@@ -1,0 +1,1 @@
+xvfb-run --auto-servernum --server-num=1 yarn start
