@@ -49,6 +49,7 @@ options.add_argument(f"--profile-directory={os.environ['CHROME_PROFILE']}")
 options.add_argument("--disable-dev-shm-usage")
 options.add_argument("--disable-infobars")
 options.add_argument("--disable-extensions")
+options.add_argument("--disable-gpu")
 options.add_argument("--start-fullscreen")
 
 
