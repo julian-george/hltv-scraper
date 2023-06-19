@@ -131,6 +131,8 @@ threshold_similarity = 0.6
 
 
 def get_unplayed_match_by_team_names(team_one_name, team_two_name, date=None):
+    team_one_name = team_one_name.lower()
+    team_two_name = team_two_name.lower()
     draft_title_1 = f"{team_one_name} vs. {team_two_name}"
     draft_title_2 = f"{team_two_name} vs. {team_one_name}"
     all_unplayed = list(
@@ -143,11 +145,11 @@ def get_unplayed_match_by_team_names(team_one_name, team_two_name, date=None):
     )
     best_match = None
     best_similarity = 0
-
     for unplayed in all_unplayed:
+        match_title = unplayed["title"]
         curr_similarity = max(
-            jellyfish.jaro_similarity(unplayed["title"], draft_title_1),
-            jellyfish.jaro_similarity(unplayed["title"], draft_title_2),
+            jellyfish.jaro_similarity(match_title, draft_title_1),
+            jellyfish.jaro_similarity(match_title, draft_title_2),
         )
         if curr_similarity > best_similarity and curr_similarity > threshold_similarity:
             if date == None or abs(date - unplayed["date"]) < unplayed_threshold:
