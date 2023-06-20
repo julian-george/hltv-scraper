@@ -1,4 +1,2 @@
-while [ true ]
-do
-    timeout 6h ./run-betting.sh
-done
+cd prediction
+xvfb-run --auto-servernum --server-num=1 python3 betting.py

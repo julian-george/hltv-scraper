@@ -1,2 +1,5 @@
-cd prediction
-xvfb-run --auto-servernum --server-num=1 python3 betting.py
+while [ true ]
+do
+    timeout 6h ./run-betting.sh
+    sudo rm -rf /tmp/*
+done
