@@ -16,7 +16,6 @@ from selenium.common.exceptions import StaleElementReferenceException
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.core.utils import ChromeType
-from pyvirtualdisplay import Display
 
 from predicting import (
     predict_match,
