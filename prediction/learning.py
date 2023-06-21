@@ -9,7 +9,7 @@ import pandas as pd
 import keras_tuner
 from datetime import datetime
 
-# import tensorflow_model_optimization as tfmot
+import tensorflow_model_optimization as tfmot
 from tensorflow import keras
 from sklearn.model_selection import train_test_split
 from learning_helper import process_frame
@@ -43,10 +43,12 @@ def split_dataset(dataset, test_ratio=0.30, seed=1234):
 
 try:
     feature_matrix = np.load(matrix_file_path)
+    print("matrix loaded")
 except:
     print("No feature matrix found, building from data frame")
     try:
         # low_memory=False to get rid of mixed-type warning
+        # TODO: move all of this to own function to allow for easier frame import
         feature_frame = pd.read_csv(frame_file_path, index_col=[0], low_memory=False)
         feature_frame = feature_frame.reindex(sorted(feature_frame.columns), axis=1)
         feature_frame = feature_frame.sort_values(by=["map_date"])
@@ -84,13 +86,6 @@ except:
 print("Feature matrix processed, shape:", feature_matrix.shape)
 
 try:
-    examine_frame = pd.read_csv(
-        examine_frame_file_path,
-        index_col=[0],
-    )
-except:
-    print("Unable to get examine frame")
-try:
     examine_ids = pd.read_csv(examine_ids_file_path, index_col=[0])
 except:
     print("Unable to get examine ids")
@@ -110,10 +105,14 @@ test_sets = []
 
 date_column = list(feature_frame.columns).index("map_date")
 
+print(feature_frame.iloc[1])
+
+
 for i in range(num_test_sets):
     X_train, X_test, y_train, y_test = train_test_split(
         X_train, y_train, test_size=245, shuffle=False
     )
+    print(X_test[0, date_column])
     test_sets.append(
         (
             X_test[:, :-1],
@@ -165,36 +164,46 @@ X_test = X_test[:, :-1]
 # )
 # viz_rf_model.view(scale=1.2)
 
-num_features = X.shape[1]
 
 normalization_layer = keras.layers.Normalization()
 normalization_layer.adapt(X_train)
 
+num_features = X_train.shape[1]
 
-def build_model(hp=None):
-    default_layer_size_diff = 20
-    layer_size_diff = default_layer_size_diff
-    # layer_size_diff = (
-    #     hp.Choice(
-    #         "layer_size_diff",
-    #         [
-    #             -20,
-    #             -10,
-    #             0,
-    #             10,
-    #             20,
-    #         ],
-    #     )
-    #     if hp
-    #     else default_layer_size_diff
-    # )
+
+def build_model(hp=None, normalize=True):
+    default_layer_size_diff = 0
+    layer_size_diff = (
+        hp.Choice(
+            "layer_size_diff",
+            [
+                -20,
+                -10,
+                0,
+                10,
+                20,
+            ],
+        )
+        if hp
+        else default_layer_size_diff
+    )
     layer_size = num_features + layer_size_diff
 
-    default_layer_num = 4
+    default_layer_num = 12
     layer_num = (
         hp.Choice(
             "layer_num",
-            [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
+            [
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                10,
+                12,
+            ],
         )
         if hp
         else default_layer_num
@@ -204,21 +213,32 @@ def build_model(hp=None):
 
     layer_list = []
 
-    layer_list.append(normalization_layer)
+    if normalize:
+        layer_list.append(normalization_layer)
+    else:
+        layer_list.append(keras.layers.InputLayer(num_features))
 
     for l_i in range(layer_num):
         layer_list.append(keras.layers.Dense(layer_size, activation_function))
 
     layer_list.append(keras.layers.Dense(2, activation="softmax"))
     model = keras.Sequential(layer_list)
-    model.summary()
-    default_learning_rate = 0.0001
-    learning_rate = default_learning_rate
-    # learning_rate = (
-    #     hp.Choice("learning_rate", [0.0025, 0.001, 0.0005, 0.0001, 0.00005, 0.00001])
-    #     if hp
-    #     else default_learning_rate
-    # )
+    model.build()
+    default_learning_rate = 0.001
+    # learning_rate = default_learning_rate
+    learning_rate = (
+        hp.Choice(
+            "learning_rate",
+            [
+                0.005,
+                0.0025,
+                0.001,
+                0.0005,
+            ],
+        )
+        if hp
+        else default_learning_rate
+    )
     opt = keras.optimizers.Adam(learning_rate=learning_rate)
     model.compile(
         optimizer=opt,
@@ -232,6 +252,7 @@ def build_model(hp=None):
             keras.metrics.sparse_categorical_accuracy,
         ],
     )
+    model.summary()
 
     return model
 
@@ -246,19 +267,19 @@ validation_split = 0.25
 scores = []
 model = None
 csv_logger = tf.keras.callbacks.CSVLogger("metrics.csv")
+print(normalized_X.shape[1], num_features)
 for i in range(1):
     model = build_model()
     history = model.fit(
         normalized_X,
         y_train,
         batch_size=batch_size,
-        validation_split=0.2,
+        validation_split=validation_split,
         epochs=epoch_num,
         callbacks=[
             tf.keras.callbacks.EarlyStopping(monitor="val_acc", patience=3),
             tf.keras.callbacks.CSVLogger("metrics.csv"),
         ],
-        # it's unclear if this actually improves betting performance
         sample_weight=X_train_weights,
     )
     for test_set in test_sets:
@@ -298,48 +319,73 @@ model.save(model_path)
 
 # prune_low_magnitude = tfmot.sparsity.keras.prune_low_magnitude
 
-# num_images = X.shape[0] * (1 - validation_split)
-# end_step = np.ceil(num_images / batch_size).astype(np.int32) * epoch_num
+# num_points = normalized_X.shape[0] * (1 - validation_split)
+# end_step = np.ceil(num_points / batch_size).astype(np.int32) * epoch_num
 
-# # Define model for pruning.
+# # # Define model for pruning.
 # pruning_params = {
 #     "pruning_schedule": tfmot.sparsity.keras.PolynomialDecay(
-#         initial_sparsity=0.5, final_sparsity=0.8, begin_step=0, end_step=end_step
-#     )
+#         initial_sparsity=0.5, final_sparsity=0.9, begin_step=0, end_step=end_step
+#     ),
 # }
-
-# model_for_pruning = prune_low_magnitude(model, **pruning_params)
-
-# # `prune_low_magnitude` requires a recompile.
-# model_for_pruning.compile(
-#     optimizer="adam",
-#     loss=tf.keras.losses.SparseCategoricalCrossentropy(),
-#     metrics=["accuracy"],
-# )
-
-# model_for_pruning.summary()
 
 # callbacks = [
 #     tfmot.sparsity.keras.UpdatePruningStep(),
 # ]
 
+# normalized_X = normalization_layer(X_train)
+
+# model_for_pruning = build_model(normalize=False)
+
 # model_for_pruning.fit(
-#     X,
-#     y,
+#     normalized_X,
+#     y_train,
 #     batch_size=batch_size,
 #     epochs=epoch_num,
 #     validation_split=validation_split,
 #     callbacks=callbacks,
+#     sample_weight=X_train_weights,
 # )
+
+# model_for_pruning = prune_low_magnitude(model_for_pruning, **pruning_params)
+
+# # # `prune_low_magnitude` requires a recompile.
+# model_for_pruning.compile(
+#     optimizer="adam",
+#     loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+#     metrics=[
+#         keras.metrics.SparseCategoricalAccuracy(name="acc"),
+#     ],
+#     weighted_metrics=[
+#         keras.losses.sparse_categorical_crossentropy,
+#         keras.metrics.sparse_categorical_accuracy,
+#     ],
+# )
+
+# model_for_pruning.summary()
+
+
+# model_for_pruning.fit(
+#     normalized_X,
+#     y_train,
+#     batch_size=batch_size,
+#     epochs=epoch_num * 2,
+#     validation_split=validation_split,
+#     callbacks=callbacks,
+#     sample_weight=X_train_weights,
+# )
+
+# model_for_pruning.save(model_path)
 
 # tuner = keras_tuner.Hyperband(build_model, objective="val_loss")
 # tuner.search(
-#     X,
-#     y,
+#     X_train,
+#     y_train,
 #     epochs=epoch_num,
 #     batch_size=batch_size,
 #     validation_split=validation_split,
 #     callbacks=[tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3)],
+#     sample_weight=X_train_weights,
 # )
 # best_model = tuner.get_best_models()[0]
 # print("Saving Model")

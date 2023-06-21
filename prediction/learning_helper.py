@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from copy import deepcopy
 from processing_helper import quantize_time
 from datetime import datetime
 
@@ -23,7 +24,7 @@ def process_frame(frame, label=None):
     frame = frame.reindex(sorted(frame.columns), axis=1)
     # removing non-integer tie values
     # ensuring label is an int so that decision tree viz works
-    sample_weights = frame["map_date"]
+    sample_weights = deepcopy(frame["map_date"])
     sample_weights = (sample_weights - np.min(sample_weights)) / (
         np.max(sample_weights) - np.min(sample_weights)
     )
