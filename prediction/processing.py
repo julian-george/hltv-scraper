@@ -175,6 +175,7 @@ if __name__ == "__main__":
         end_time = datetime.now()
         elapsed_time = end_time - start_time
         elapsed_time = elapsed_time.seconds / 60
+        feature_data.history = set(feature_data.frame["map_id"])
         if feature_data.history != None:
             final_map_num = len(feature_data.history)
             maps_processed = final_map_num - initial_map_num

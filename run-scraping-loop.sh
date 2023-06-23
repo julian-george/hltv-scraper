@@ -1,5 +1,5 @@
 while [ true ]
 do
-   timeout 15m ./run-scraping.sh;
+   timeout 30m ./run-scraping.sh;
    sleep 600
 done

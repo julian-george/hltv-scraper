@@ -17,6 +17,7 @@ from predicting import map_ids_to_examine
 
 
 frame_file_path = "saved-frame.csv"
+processed_frame_file_path = "processed-frame.csv"
 examine_frame_file_path = "examine-frame.csv"
 examine_ids_file_path = "examine-ids.csv"
 matrix_file_path = "cached-matrix.npy"
@@ -24,7 +25,7 @@ matrix_file_path = "cached-matrix.npy"
 feature_frame = None
 feature_matrix = None
 examine_frame = None
-examine_ids = map_ids_to_examine()[:-30:2]
+examine_ids = None
 
 examine_matrix = None
 X = None
@@ -41,36 +42,43 @@ def split_dataset(dataset, test_ratio=0.30, seed=1234):
     return dataset[~test_indices], dataset[test_indices]
 
 
+cached_frame = True
+
 try:
-    feature_matrix = np.load(matrix_file_path)
-    print("matrix loaded")
+    feature_frame = pd.read_csv(processed_frame_file_path)
+    examine_frame = pd.read_csv(examine_frame_file_path)
+    examine_ids = pd.read_csv(examine_ids_file_path)
+    print("Cached frames loaded")
 except:
-    print("No feature matrix found, building from data frame")
+    print("Reprocessing frames")
+    cached_frame = False
+    feature_frame = pd.read_csv(frame_file_path, index_col=[0], low_memory=False)
+    feature_frame = feature_frame.reindex(sorted(feature_frame.columns), axis=1)
+    feature_frame = feature_frame.sort_values(by=["map_date"])
+    examine_ids = map_ids_to_examine()[:-1:2]
+    examine_frame = feature_frame[
+        (feature_frame["map_id"].astype("int").isin(examine_ids))
+    ]
+    examine_ids = examine_frame["map_id"]
+
+    examine_ids.to_csv(examine_ids_file_path)
+    feature_frame = feature_frame[
+        (feature_frame[label] != 0.5) & ~(feature_frame["map_id"].isin(examine_ids))
+    ].dropna()
+    (feature_frame, y, sample_weights) = process_frame(feature_frame, label)
+    (examine_frame, examine_y, _) = process_frame(examine_frame, label)
+    examine_frame.to_csv(examine_frame_file_path)
+    print("Feature frame loaded, shape:", feature_frame.shape)
+    feature_frame.to_csv(processed_frame_file_path)
+
+try:
+    if not cached_frame:
+        raise Exception
+    feature_matrix = np.load(matrix_file_path)
+    print("Cached matrix loaded")
+except:
+    print("Rebuilding matrix")
     try:
-        # low_memory=False to get rid of mixed-type warning
-        # TODO: move all of this to own function to allow for easier frame import
-        feature_frame = pd.read_csv(frame_file_path, index_col=[0], low_memory=False)
-        feature_frame = feature_frame.reindex(sorted(feature_frame.columns), axis=1)
-        feature_frame = feature_frame.sort_values(by=["map_date"])
-        feature_frame.to_csv("sorted_saved.csv")
-        examine_frame = feature_frame[
-            (feature_frame["map_id"].astype("int").isin(examine_ids))
-        ]
-        examine_ids = examine_frame["map_id"]
-
-        examine_ids.to_csv(examine_ids_file_path)
-        feature_frame = feature_frame[
-            (feature_frame[label] != 0.5) & ~(feature_frame["map_id"].isin(examine_ids))
-        ].dropna()
-        print("Feature frame loaded, shape:", feature_frame.shape)
-        (feature_frame, y, sample_weights) = process_frame(feature_frame, label)
-        (examine_frame, examine_y, _) = process_frame(examine_frame, label)
-        examine_frame.to_csv(examine_frame_file_path)
-
-        # feature_frame.info(verbose=True)
-        feature_frame.drop(label, axis=1).to_csv("test2.csv")
-        # with open("f.txt", "w") as f:
-        #     f.write("\n".join(sorted(list(feature_frame.columns))))
         feature_matrix = np.hstack(
             [
                 feature_frame.drop(label, axis=1).to_numpy(),
@@ -99,20 +107,16 @@ X_train = X
 y_train = y
 
 num_test_sets = 30
-test_set_size = 245
+test_set_size = 12
 
 test_sets = []
 
 date_column = list(feature_frame.columns).index("map_date")
 
-print(feature_frame.iloc[1])
-
-
 for i in range(num_test_sets):
     X_train, X_test, y_train, y_test = train_test_split(
-        X_train, y_train, test_size=245, shuffle=False
+        X_train, y_train, test_size=test_set_size, shuffle=False
     )
-    print(X_test[0, date_column])
     test_sets.append(
         (
             X_test[:, :-1],
