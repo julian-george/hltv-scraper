@@ -189,7 +189,7 @@ def build_model(hp=None, normalize=True):
     )
     layer_size = num_features + layer_size_diff
 
-    default_layer_num = 12
+    default_layer_num = 4
     layer_num = (
         hp.Choice(
             "layer_num",
