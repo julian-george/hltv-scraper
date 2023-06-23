@@ -547,6 +547,11 @@ def generate_data_point(curr_map, played=True, map_info=None):
                 ]
             )
         )
+        # TODO: deceiving, since sometimes match id if unplaeyd
+        w["map_id"] = curr_map["hltvId"]
+
+        print(f"ID: {w['map_id']}, performance #: {len(performances)}")
+
         condition_dict = {
             matchup_category: matchup_condition(team_one_ids, team_two_ids),
             "map": map_condition(map_name),
@@ -560,7 +565,6 @@ def generate_data_point(curr_map, played=True, map_info=None):
         )
         w |= results_data
 
-        w["map_id"] = curr_map["hltvId"]
         if played:
             winner_score = (
                 curr_map["score"]["teamOne"]["ct"]
