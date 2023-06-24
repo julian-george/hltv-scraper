@@ -38,9 +38,11 @@ export const scrapeResults = async ($: CheerioAPI, resultsUrl: string) => {
       }
       if (!TRAVERSE_ADDED_MATCHES) {
         console.log(
-          `Match ID " + matchId + " already in database, ${
-            FINISH_UPON_DUPLICATE ? "finishing" : "skipping"
-          }.`
+          `Match ID ` +
+            matchId +
+            ` already in database, ${
+              FINISH_UPON_DUPLICATE ? "finishing" : "skipping"
+            }.`
         );
         continue;
       }

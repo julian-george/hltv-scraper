@@ -238,13 +238,13 @@ export const parseMatch = async (
                 date
               )
                 .catch((err) => {
-                  console.error(
+                  const errMessage =
                     "Error while parsing map ID " +
-                      mapId +
-                      ", reason: '" +
-                      err +
-                      "'."
-                  );
+                    mapId +
+                    ", reason: '" +
+                    err +
+                    "'.";
+                  throw new Error(errMessage);
                 })
                 .finally(() => {
                   resolve(true);
