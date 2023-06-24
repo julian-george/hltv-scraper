@@ -4,7 +4,7 @@
   "results": {
     "offset": 0,
     "finishUponDuplicate": true,
-    "traverseAdded": false,
+    "traverseAdded": true,
     "overwriteMatches": false
   },
   "unplayedMatches": {
@@ -12,13 +12,12 @@
     "overwrite": false
   },
   "browsers": {
-    "limit": 2,
-    "numHeadful": 2,
+    "limit": 4,
+    "numHeadful": 4,
     "maxChallengeAttempts": 12,
     "forceHeadful": true,
     "forceHeadless": false,
     "scrapeDelay": 750,
-    "webshareFormat": true,
-    "ipUrl": "https://proxy.webshare.io/api/v2/proxy/list/download/cyxykwloqjioumllmdvstnglaxdlvezeyqnwswcr/-/any/username/direct/-/"
+    "webshareFormat": true
   }
 }

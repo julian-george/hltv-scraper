@@ -84,7 +84,7 @@ default_map_infos = [
 ]
 
 
-def generate_prediction(match, map_infos=None, same_order=True, ignore_cache=False):
+def predict_match(match, map_infos=None, same_order=True, ignore_cache=False):
     if map_infos == None:
         print("No map infos provided, using default.")
         map_infos = default_map_infos
@@ -113,7 +113,7 @@ def generate_prediction(match, map_infos=None, same_order=True, ignore_cache=Fal
     for map_name, predictions in map_predictions.items():
         if not same_order:
             map_predictions[map_name].reverse()
-        map_predictions[map_name] = [round(prediction, 3) for prediction in predictions]
+        map_predictions[map_name] = [round(prediction, 5) for prediction in predictions]
     return map_predictions
 
 
@@ -161,13 +161,9 @@ def get_unplayed_match_by_team_names(team_one_name, team_two_name, date=None):
     same_order = jellyfish.jaro_similarity(
         team_one_name, team_names[0]
     ) > jellyfish.jaro_similarity(team_one_name, team_names[1])
-    print("bestsimilarity", best_similarity)
+    print(draft_title_1, best_match["title"])
+    print("bestsimilarity", best_similarity, "sameorder", same_order)
     return best_match, same_order
-
-
-def predict_match(match, map_infos, same_order=True):
-    map_predictions = generate_prediction(match, map_infos, same_order)
-    return map_predictions
 
 
 def maps_to_examine():
@@ -209,7 +205,7 @@ def predict_all_matches():
     print("Predicting", len(all_unplayed), "matches...")
     predictions = {}
     for match in all_unplayed:
-        predictions[match["title"]] = generate_prediction(match)
+        predictions[match["title"]] = predict_match(match)
     return predictions
 
 
@@ -230,11 +226,11 @@ if __name__ == "__main__":
 
         elif len(sys.argv) == 3:
             match, same_order = get_unplayed_match_by_team_names(
-                sys.argv[1], sys.argv[2]
+                sys.argv[1], sys.argv[2], date=datetime.now()
             )
             team_names = [sys.argv[1], sys.argv[2]]
         prediction = predict_match(
-            match, match["mapInfos"] or default_map_infos, same_order
+            match, match["mapInfos"] or default_map_infos, same_order, ignore_cache=True
         )
         if prediction == None:
             print("No such match found")

@@ -1,14 +1,14 @@
 import sys
-from predicting import get_match_by_id, generate_prediction
+from predicting import get_match_by_id, predict_match
 from processing import predict_played_match
 
 
 def compare_predictions(hltv_id):
     unplayed_match = get_match_by_id(hltv_id)
     map_infos = None
-    if "mapInfos" in unplayed_match:
+    if "mapInfos" in unplayed_match and len(unplayed_match["mapInfos"]) > 0:
         map_infos = unplayed_match["mapInfos"]
-    u_pred = generate_prediction(unplayed_match, map_infos, ignore_cache=True)
+    u_pred = predict_match(unplayed_match, map_infos, ignore_cache=True)
 
     p_pred = predict_played_match(hltv_id)
 

@@ -14,6 +14,8 @@ import { delay } from "./scrape-util.js";
 import { getQueue } from "./queues.js";
 
 dotenv.config();
+
+const IP_URL = process.env.IP_URL;
 const CACHED = config.get("scrapeCached");
 const NUM_HEADFUL = config.get("browsers.numHeadful");
 const MAX_CHALLENGE_TRIES = config.get("browsers.maxChallengeAttempts");
@@ -22,7 +24,6 @@ const FORCE_HEADFUL = config.get("browsers.forceHeadful");
 const FORCE_HEADLESS = config.get("browsers.forceHeadless");
 const SCRAPE_DELAY = config.get("browsers.scrapeDelay");
 const WEBSHARE = config.get("browsers.webshareFormat");
-const IP_URL = config.get("browsers.ipUrl");
 
 const SCREEN_HEIGHT = 1400;
 const SCREEN_WIDTH = 1680;

@@ -5,10 +5,10 @@ from processing_helper import quantize_time
 from datetime import datetime
 
 
-delete_keywords = ["map_id", "rating", "stdev", "matchup"]
+delete_keywords = ["map_id", "rating", "stdev", "map_score"]
 
-# (adjusted) date rating 1.0 starts applying
-truncation_date = 14.197
+# when rating 2.0 starts applying (March 2016)
+truncation_date = 1456815600
 
 # temp date
 # truncation_date = quantize_time(datetime(year=2018, month=1, day=1))

@@ -58,10 +58,13 @@ model_name = "prediction_model"
 def predict_map(map, i):
     model = tf.keras.models.load_model(model_name)
     w = generate_data_point(map)
+    same_order = w["winner"] == 1
     del w["winner"]
     processed_w = process_frame(pd.DataFrame([w]))[0]
     processed_w.to_csv(f"w_{i}_played.csv")
-    prediction = model.predict(processed_w.to_numpy())
+    prediction = list(model.predict(processed_w.to_numpy())[0].round(5))
+    if not same_order:
+        prediction.reverse()
     return prediction
 
 
@@ -120,6 +123,7 @@ if __name__ == "__main__":
             for type in stat_types:
                 round_stats_columns.append(f"round_{type}_{side}_{suffix}")
                 rating_stats_columns.append(f"rating_{type}_{side}_{suffix}")
+            column_names.append(f"map_score_{side}_{suffix}")
         # shared between round stats and rating stats
         rating_stats_columns.append(f"mapsplayed_avg_{suffix}")
         column_names.append(f"ranking_{suffix}")
@@ -137,6 +141,8 @@ if __name__ == "__main__":
         column_names.append(f"total_avg_otwinrate_{suffix}")
 
         column_names.append(f"map_pick_{suffix}")
+
+        column_names.append(f"map_score_ot_{suffix}")
 
     matchup_category = "matchup"
 

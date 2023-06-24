@@ -446,6 +446,7 @@ def generate_data_point(curr_map, played=True, map_info=None):
             else [str(pid) for pid in curr_map["players"]["secondTeam"]]
         )
         if len(team_one_ids) != 5 or len(team_two_ids) != 5:
+            print("Non-five team sizes", team_one_ids, team_two_ids)
             return None
         online = related_match["online"] if played else curr_map["online"]
         w["online_bool"] = online
@@ -486,8 +487,11 @@ def generate_data_point(curr_map, played=True, map_info=None):
 
         picked_by = curr_map.get("pickedBy", "") if played else map_info["picked_by"]
 
-        w["map_pick_team_one"] = picked_by == ("teamOne" if winner == 1 else "teamTwo")
-        w["map_pick_team_two"] = picked_by == ("teamTwo" if winner == 1 else "teamOne")
+        team_one_key = "teamOne" if winner == 1 else "teamTwo"
+        team_two_key = "teamTwo" if winner == 1 else "teamOne"
+
+        w["map_pick_team_one"] = picked_by == team_one_key
+        w["map_pick_team_two"] = picked_by == team_two_key
 
         w["map_num"] = curr_map.get("mapNum", 0) if played else map_info["map_num"]
 
@@ -550,7 +554,7 @@ def generate_data_point(curr_map, played=True, map_info=None):
         # TODO: deceiving, since sometimes match id if unplaeyd
         w["map_id"] = curr_map["hltvId"]
 
-        print(f"ID: {w['map_id']}, performance #: {len(performances)}")
+        # print(f"ID: {w['map_id']}, performance #: {len(performances)}")
 
         condition_dict = {
             matchup_category: matchup_condition(team_one_ids, team_two_ids),
@@ -566,19 +570,23 @@ def generate_data_point(curr_map, played=True, map_info=None):
         w |= results_data
 
         if played:
-            winner_score = (
-                curr_map["score"]["teamOne"]["ct"]
-                + curr_map["score"]["teamOne"]["t"]
-                + curr_map["score"]["teamOne"]["ot"]
+            team_one_score = (
+                curr_map["score"][team_one_key]["ct"]
+                + curr_map["score"][team_one_key]["t"]
+                + curr_map["score"][team_one_key]["ot"]
             )
-            loser_score = (
-                curr_map["score"]["teamTwo"]["ct"]
-                + curr_map["score"]["teamTwo"]["t"]
-                + curr_map["score"]["teamTwo"]["ot"]
+            team_two_score = (
+                curr_map["score"][team_two_key]["ct"]
+                + curr_map["score"][team_two_key]["t"]
+                + curr_map["score"][team_two_key]["ot"]
             )
-            if winner_score == loser_score:
+            if team_one_score == team_two_score:
                 winner = 0.5
             w["winner"] = winner
+            for side in ["ct", "t", "ot"]:
+                w[f"map_score_{side}_team_one"] = curr_map["score"][team_one_key][side]
+                w[f"map_score_{side}_team_two"] = curr_map["score"][team_two_key][side]
+
         return w
     except Exception as e:
         print("Unable to process map id", curr_map["hltvId"])

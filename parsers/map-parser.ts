@@ -3,6 +3,7 @@ import config from "config";
 import fs from "fs";
 import puppeteerGet from "../scrape-client.js";
 import { createMap } from "../services/map-service.js";
+import _ from "lodash";
 
 const CACHED = config.get("scrapeCached");
 
@@ -170,6 +171,13 @@ const parseMap = async (
         teamTwoStats = firstTeamStats;
       }
     }
+  }
+  if (
+    _.isEmpty(players) ||
+    _.isEmpty(teamOneStats) ||
+    _.isEmpty(teamTwoStats)
+  ) {
+    throw new Error("Empty stats or players for map ID " + hltvId);
   }
   const newMap = {
     hltvId: Number(hltvId),

@@ -32,13 +32,18 @@ export const scrapeResults = async ($: CheerioAPI, resultsUrl: string) => {
     const resultUrl = resultLink.attribs["href"];
     const matchId = Number(resultUrl.split("/")[2]);
     const match = await getMatchByHltvId(matchId);
-    if (!CACHED && match && !TRAVERSE_ADDED_MATCHES) {
+    if (!CACHED && match) {
       if (FINISH_UPON_DUPLICATE) {
-        console.log("Match ID " + matchId + " already in database, finishing.");
         finished = true;
       }
-      console.log("Match ID " + matchId + " already in database, skipping.");
-      continue;
+      if (!TRAVERSE_ADDED_MATCHES) {
+        console.log(
+          `Match ID " + matchId + " already in database, ${
+            FINISH_UPON_DUPLICATE ? "finishing" : "skipping"
+          }.`
+        );
+        continue;
+      }
     }
     const resultExecutor = async () => {
       const resultPage = !CACHED
