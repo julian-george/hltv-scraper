@@ -4,7 +4,7 @@
   "results": {
     "offset": 0,
     "finishUponDuplicate": true,
-    "traverseAdded": true,
+    "traverseAdded": false,
     "overwriteMatches": false
   },
   "unplayedMatches": {
