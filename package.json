@@ -24,7 +24,7 @@
     "node-fetch": "^3.3.1",
     "p-queue": "^7.3.4",
     "proxy-chain": "^2.2.0",
-    "puppeteer": "18.1.0",
+    "puppeteer": "^20.7.3",
     "puppeteer-extra": "^3.3.4",
     "puppeteer-extra-plugin-stealth": "^2.11.1",
     "request": "^2.88.2",
