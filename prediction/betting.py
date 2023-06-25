@@ -153,23 +153,24 @@ def market_bet(prediction, market_element, bet_browser):
     # TODO: what is the point of this variable?
     home_win = False
     betted_odds = away_odds
+    # remember, prediction[1] is actually the chances that home will win!
     if (
-        prediction[0] >= underdog_threshold
-        and weighted_prediction(prediction[0]) >= home_odds
+        prediction[1] >= underdog_threshold
+        and weighted_prediction(prediction[1]) >= home_odds
     ):
         home_win = True
         betted_odds = home_odds
         home_button.click()
         print(
-            f"Betting home - prediction: {prediction[0]}, odds: {home_odds}, unadjusted {page_home_odds}"
+            f"Betting home - prediction: {prediction[1]}, odds: {home_odds}, unadjusted {page_home_odds}"
         )
     elif (
-        prediction[1] >= underdog_threshold
-        and weighted_prediction(prediction[1]) >= away_odds
+        prediction[0] >= underdog_threshold
+        and weighted_prediction(prediction[0]) >= away_odds
     ):
         away_button.click()
         print(
-            f"Betting away - prediction: {prediction[1]}, odds: {away_odds}, unadjusted {page_away_odds}"
+            f"Betting away - prediction: {prediction[0]}, odds: {away_odds}, unadjusted {page_away_odds}"
         )
     else:
         print(f"No bet made. Prediction: {prediction}, odds: {[home_odds,away_odds]}")
