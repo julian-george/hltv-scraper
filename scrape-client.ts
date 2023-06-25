@@ -89,9 +89,9 @@ const addNewBrowser = async (headful: boolean) => {
   const newBrowser = await puppeteer.launch({
     headless: !headful,
     args: [
-      // "--no-sandbox",
-      // "--disable-setuid-sandbox",
-      // "--disable-gpu",
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-gpu",
       WINDOW_SIZE_FLAG,
       positionFlag,
       proxyFlag,

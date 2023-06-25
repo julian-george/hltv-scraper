@@ -107,8 +107,8 @@ X = feature_matrix[:, :-1]
 X_train = X
 y_train = y
 
-num_test_sets = 3
-test_set_size = 1
+num_test_sets = 6
+test_set_size = 2
 
 test_sets = []
 
