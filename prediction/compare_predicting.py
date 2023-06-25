@@ -11,7 +11,7 @@ def compare_predictions(hltv_id):
     u_pred = predict_match(unplayed_match, map_infos, ignore_cache=True)
 
     p_pred = predict_played_match(hltv_id)
-
+    print(unplayed_match["title"])
     print("Unplayed prediction", u_pred)
     print("Played prediction", p_pred)
 

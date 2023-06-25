@@ -45,7 +45,7 @@ def split_dataset(dataset, test_ratio=0.30, seed=1234):
 cached_frame = True
 
 try:
-    feature_frame = pd.read_csv(processed_frame_file_path)
+    feature_frame = pd.read_csv(processed_frame_file_path, index_col=[0])
     examine_frame = pd.read_csv(examine_frame_file_path)
     examine_ids = pd.read_csv(examine_ids_file_path)
     print("Cached frames loaded")
@@ -55,7 +55,8 @@ except:
     feature_frame = pd.read_csv(frame_file_path, index_col=[0], low_memory=False)
     feature_frame = feature_frame.reindex(sorted(feature_frame.columns), axis=1)
     feature_frame = feature_frame.sort_values(by=["map_date"])
-    examine_ids = map_ids_to_examine()[:-1:2]
+    # examine_ids = map_ids_to_examine()[:-1:2]
+    examine_ids = []
     examine_frame = feature_frame[
         (feature_frame["map_id"].astype("int").isin(examine_ids))
     ]
@@ -106,8 +107,8 @@ X = feature_matrix[:, :-1]
 X_train = X
 y_train = y
 
-num_test_sets = 30
-test_set_size = 12
+num_test_sets = 3
+test_set_size = 1
 
 test_sets = []
 
@@ -117,6 +118,7 @@ for i in range(num_test_sets):
     X_train, X_test, y_train, y_test = train_test_split(
         X_train, y_train, test_size=test_set_size, shuffle=False
     )
+    print(datetime.fromtimestamp(X_test[0, date_column]))
     test_sets.append(
         (
             X_test[:, :-1],
@@ -134,40 +136,6 @@ X_train_weights = X_train[:, -1]
 X_train = X_train[:, :-1]
 
 X_test = X_test[:, :-1]
-
-# # Split into training and test sets
-# rf_train_pd, rf_test_pd = split_dataset(feature_frame)
-# print(
-#     f"{len(rf_train_pd)} examples in training, {len(rf_test_pd)} examples for testing."
-# )
-
-# classes = list(feature_frame[label].unique())
-
-
-# # Convert to tensorflow data sets
-# rf_train = tfdf.keras.pd_dataframe_to_tf_dataset(rf_train_pd, label=label)
-# rf_test = tfdf.keras.pd_dataframe_to_tf_dataset(rf_test_pd, label=label)
-
-# # Train a Random Forest model.
-# rf_model = tfdf.keras.RandomForestModel(verbose=0, random_seed=1234)
-# rf_model.fit(rf_train)
-
-# rf_model.compile(metrics=["accuracy"])
-# rf_model.evaluate(rf_test, return_dict=True, verbose=0)
-
-# # Tell dtreeviz about training data and model
-# rf_features = [f.name for f in rf_model.make_inspector().features()]
-# viz_rf_model = dtreeviz.model(
-#     rf_model,
-#     tree_index=3,
-#     X_train=rf_train_pd[rf_features],
-#     y_train=rf_train_pd[label],
-#     feature_names=rf_features,
-#     target_name=label,
-#     class_names=[0, 1],
-# )
-# viz_rf_model.view(scale=1.2)
-
 
 normalization_layer = keras.layers.Normalization()
 normalization_layer.adapt(X_train)
@@ -263,7 +231,6 @@ def build_model(hp=None, normalize=True):
 
 # normalized_X = normalization_layer(X_train)
 normalized_X = X_train
-print(examine_ids["map_id"])
 batch_size = 32
 epoch_num = 32
 validation_split = 0.25
@@ -286,12 +253,16 @@ for i in range(1):
         ],
         sample_weight=X_train_weights,
     )
-    for test_set in test_sets:
+    for i, test_set in enumerate(test_sets):
         print(test_set[2])
+        print(test_set[1])
+        pd.DataFrame(test_set[0]).to_csv(f"w_{i}_learning.csv")
         scores.append(model.evaluate(test_set[0], test_set[1], batch_size=1)[1])
+        print(model.predict(test_set[0]), test_set[1])
+
 print(np.mean(scores))
 
-model.evaluate(examine_frame.drop(label, axis=1), examine_frame[label], batch_size=1)
+# model.evaluate(examine_frame.drop(label, axis=1), examine_frame[label], batch_size=1)
 # for i, data_point in examine_frame.drop(label, axis=1).iterrows():
 #     print(examine_ids["map_id"][i], model.predict(np.array([data_point.to_numpy()])))
 
@@ -394,55 +365,3 @@ model.save(model_path)
 # best_model = tuner.get_best_models()[0]
 # print("Saving Model")
 # best_model.save(model_path)
-
-
-# scaler = RobustScaler()
-# scaler.fit(X_train)
-# X_train = scaler.transform(X_train)
-# X_test = scaler.transform(X_test)
-# clf = MLPClassifier(
-#     random_state=1,
-#     max_iter=200,
-#     activation="relu",
-#     early_stopping=True,
-#     hidden_layer_sizes=(250, 250, 250, 250),
-# ).fit(X_train, y_train)
-# clfs.append(clf)
-
-
-# classifier_labels = [
-#     "Winner T Score",
-#     "Winner CT Score",
-#     "Winner OT Score",
-#     "Loser T Score",
-#     "Loser CT Score",
-#     "Loser OT Score",
-# ]
-
-# for i in range(6):
-#     print("Scraping", i)
-#     X = feature_matrix[:, :-8]
-#     y = feature_matrix[:, -8 + i].T
-#     X_train, X_test, y_train, y_test = train_test_split(X, y)
-
-#     scaler = StandardScaler()
-#     scaler.fit(X_train)
-#     X_train = scaler.transform(X_train)
-#     X_test = scaler.transform(X_test)
-#     clf = MLPRegressor(random_state=1, max_iter=500).fit(X_train, y_train)
-#     # clf.predict_proba(X_test[:1])
-#     clf.predict(X_test)
-#     print(classifier_labels[i], clf.score(X_test, y_test))
-#     clfs.append(clf)
-
-# file_titles = [
-#     "win_t_model.sav",
-#     "win_ct_model.sav",
-#     "win_ot_model.sav",
-#     "lose_t_model.sav",
-#     "lose_ct_model.sav",
-#     "lose_ot_model.sav",
-# ]
-
-for i in range(len(clfs)):
-    pickle.dump(clfs[i], open(f"model-{i}.sav", "wb+"))

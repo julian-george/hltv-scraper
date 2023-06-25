@@ -59,13 +59,14 @@ def predict_map(map, i):
     model = tf.keras.models.load_model(model_name)
     w = generate_data_point(map)
     same_order = w["winner"] == 1
+    winner = w["winner"]
     del w["winner"]
     processed_w = process_frame(pd.DataFrame([w]))[0]
     processed_w.to_csv(f"w_{i}_played.csv")
     prediction = list(model.predict(processed_w.to_numpy())[0].round(5))
-    if not same_order:
-        prediction.reverse()
-    return prediction
+    # if not same_order:
+    #     prediction.reverse()
+    return prediction, winner
 
 
 if __name__ == "__main__":
@@ -224,6 +225,7 @@ if __name__ == "__main__":
                 allowDiskUse=True,
             )
         )
+        # print([m["hltvId"] for m in maps_slice])
         threading.Thread(
             target=process_maps,
             args=(maps_slice, frame_lock, feature_data, i),

@@ -424,6 +424,8 @@ def generate_data_point(curr_map, played=True, map_info=None):
         winner = np.random.randint(2) if played else 1
         raw_date = related_match["date"] if played else curr_map["date"]
         map_name = curr_map["mapType"] if played else map_info["map_name"]
+        # TODO: deceiving, since sometimes match id if unplaeyd
+        w["map_id"] = curr_map["hltvId"]
         w["map_date"] = quantize_time(raw_date)
         team_one_ids = (
             [
@@ -446,7 +448,7 @@ def generate_data_point(curr_map, played=True, map_info=None):
             else [str(pid) for pid in curr_map["players"]["secondTeam"]]
         )
         if len(team_one_ids) != 5 or len(team_two_ids) != 5:
-            print("Non-five team sizes", team_one_ids, team_two_ids)
+            print(w["map_id"], "Non-five team sizes")
             return None
         online = related_match["online"] if played else curr_map["online"]
         w["online_bool"] = online
@@ -551,8 +553,6 @@ def generate_data_point(curr_map, played=True, map_info=None):
                 ]
             )
         )
-        # TODO: deceiving, since sometimes match id if unplaeyd
-        w["map_id"] = curr_map["hltvId"]
 
         # print(f"ID: {w['map_id']}, performance #: {len(performances)}")
 
@@ -602,10 +602,12 @@ def process_maps(maps_to_process, frame_lock, feature_data, thread_idx):
         curr_map = maps_to_process[map_idx]
         # print(f"[{thread_idx}] Processing map ID:", curr_map["hltvId"])
         w = generate_data_point(curr_map)
-        if w == None or len(w.keys()) != feature_data.frame.shape[1]:
-            # print("Partial datapoint for map id", curr_map["hltvId"])
+        if w == None or len(w.keys()) < feature_data.frame.shape[1]:
+            print(
+                "Partial datapoint for map id",
+                w["map_id"],
+            )
             continue
-
         with frame_lock:
             feature_data.frame.loc[len(feature_data.frame.index)] = w
     print(f"[{thread_idx}] Done processing maps")
