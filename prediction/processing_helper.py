@@ -561,7 +561,9 @@ def generate_data_point(curr_map, played=True, map_info=None):
             "map": map_condition(map_name),
             "online": online_condition(online),
             "event": event_condition(related_event["hltvId"]),
-            "rank": rank_condition(team_one_ids, ranking_one, ranking_two),
+            "rank": rank_condition(
+                team_one_ids, w["ranking_team_one"], w["ranking_team_two"]
+            ),
         }
 
         results_data = generate_round_rating_stats(

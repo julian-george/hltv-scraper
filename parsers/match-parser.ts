@@ -244,7 +244,8 @@ export const parseMatch = async (
                     ", reason: '" +
                     err +
                     "'.";
-                  throw new Error(errMessage);
+                  console.error(errMessage);
+                  // throw new Error(errMessage);
                 })
                 .finally(() => {
                   resolve(true);

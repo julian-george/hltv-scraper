@@ -137,8 +137,8 @@ const parseMap = async (
           kast:
             Math.round(
               Number(currRow.find(".st-kdratio").text().replace("%", "")) * 10
-            ) / 1000,
-          adr: Number(currRow.find(".st-adr").text()),
+            ) / 1000 || 0,
+          adr: Number(currRow.find(".st-adr").text()) || 0,
           fkDiff: Number(
             currRow
               .find(".st-fkdiff")
@@ -147,12 +147,7 @@ const parseMap = async (
           ),
           rating: Number(currRow.find(".st-rating").text()),
         };
-        if (
-          isNaN(statObj.kast) ||
-          // TODO: reexamine ADR, sometimes it's NaN when it's 0, but in this case thats not valid: https://www.hltv.org/stats/matches/mapstatsid/156987/godsent-vs-domination
-          isNaN(statObj.adr) ||
-          isNaN(statObj.rating)
-        ) {
+        if (isNaN(statObj.rating)) {
           throw new Error("NaN value in player statObj");
         }
         if (playerId in firstTeamStats) {
