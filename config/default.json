@@ -12,9 +12,9 @@
     "overwrite": false
   },
   "browsers": {
-    "limit": 4,
-    "numHeadful": 4,
-    "maxChallengeAttempts": 12,
+    "limit": 1,
+    "numHeadful": 1,
+    "maxChallengeAttempts": 16,
     "forceHeadful": true,
     "forceHeadless": false,
     "scrapeDelay": 750,

@@ -448,7 +448,7 @@ def generate_data_point(curr_map, played=True, map_info=None):
             else [str(pid) for pid in curr_map["players"]["secondTeam"]]
         )
         if len(team_one_ids) != 5 or len(team_two_ids) != 5:
-            print(w["map_id"], "Non-five team sizes")
+            # print(w["map_id"], "Non-five team sizes")
             return None
         online = related_match["online"] if played else curr_map["online"]
         w["online_bool"] = online
@@ -605,10 +605,10 @@ def process_maps(maps_to_process, frame_lock, feature_data, thread_idx):
         # print(f"[{thread_idx}] Processing map ID:", curr_map["hltvId"])
         w = generate_data_point(curr_map)
         if w == None or len(w.keys()) < feature_data.frame.shape[1]:
-            print(
-                "Partial datapoint for map id",
-                w["map_id"],
-            )
+            # print(
+            #     "Partial datapoint for map id",
+            #     w["map_id"],
+            # )
             continue
         with frame_lock:
             feature_data.frame.loc[len(feature_data.frame.index)] = w

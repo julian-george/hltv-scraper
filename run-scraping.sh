@@ -1,1 +1,1 @@
-xvfb-run --auto-servernum --server-num=1 yarn start
+xvfb-run --auto-servernum --server-args="-screen 0 1024x768x24" yarn start

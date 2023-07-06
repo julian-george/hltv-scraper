@@ -1,2 +1,2 @@
 cd prediction
-xvfb-run --auto-servernum --server-num=1 python3 betting.py
+xvfb-run --auto-servernum --server-args="-screen 0 1024x768x24" python3 betting.py

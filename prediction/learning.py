@@ -161,7 +161,7 @@ def build_model(hp=None, normalize=True):
     )
     layer_size = num_features + layer_size_diff
 
-    default_layer_num = 4
+    default_layer_num = 6
     layer_num = (
         hp.Choice(
             "layer_num",
@@ -251,7 +251,7 @@ for i in range(1):
             tf.keras.callbacks.EarlyStopping(monitor="val_acc", patience=3),
             tf.keras.callbacks.CSVLogger("metrics.csv"),
         ],
-        sample_weight=X_train_weights,
+        # sample_weight=X_train_wights,
     )
     for i, test_set in enumerate(test_sets):
         print(test_set[2])
@@ -262,7 +262,7 @@ for i in range(1):
 
 print(np.mean(scores))
 
-# model.evaluate(examine_frame.drop(label, axis=1), examine_frame[label], batch_size=1)
+# model.evaluate(_frame.drop(label, axis=1), examine_frame[label], batch_size=1)
 # for i, data_point in examine_frame.drop(label, axis=1).iterrows():
 #     print(examine_ids["map_id"][i], model.predict(np.array([data_point.to_numpy()])))
 
@@ -352,16 +352,16 @@ model.save(model_path)
 
 # model_for_pruning.save(model_path)
 
-# tuner = keras_tuner.Hyperband(build_model, objective="val_loss")
-# tuner.search(
-#     X_train,
-#     y_train,
-#     epochs=epoch_num,
-#     batch_size=batch_size,
-#     validation_split=validation_split,
-#     callbacks=[tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3)],
-#     sample_weight=X_train_weights,
-# )
-# best_model = tuner.get_best_models()[0]
-# print("Saving Model")
-# best_model.save(model_path)
+tuner = keras_tuner.Hyperband(build_model, objective="val_loss")
+tuner.search(
+    X_train,
+    y_train,
+    epochs=epoch_num,
+    batch_size=batch_size,
+    validation_split=validation_split,
+    callbacks=[tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3)],
+    sample_weight=X_train_weights,
+)
+best_model = tuner.get_best_models()[0]
+print("Saving Model")
+best_model.save(model_path)
