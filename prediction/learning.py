@@ -241,8 +241,10 @@ for i in range(1):
         print(test_set[2])
         print(test_set[1])
         pd.DataFrame(test_set[0]).to_csv(f"w_{i}_learning.csv")
-        scores.append(model.evaluate(test_set[0], test_set[1], batch_size=1)[1])
-        print(model.predict(test_set[0]), test_set[1])
+        scores.append(
+            round(model.evaluate(test_set[0], test_set[1], batch_size=1)[1], 3)
+        )
+        print(np.round(model.predict(test_set[0]), 3), test_set[1])
 
 print(np.mean(scores))
 

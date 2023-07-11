@@ -16,6 +16,7 @@ import { getQueue } from "./queues.js";
 dotenv.config();
 
 const IP_URL = process.env.IP_URL;
+const PROFILE_DIR = process.env.CHROME_PROFILE_DIR;
 const CACHED = config.get("scrapeCached");
 const NUM_HEADFUL = config.get("browsers.numHeadful");
 const MAX_CHALLENGE_TRIES = config.get("browsers.maxChallengeAttempts");
@@ -87,8 +88,11 @@ const addNewBrowser = async (headful: boolean) => {
   const anonymizedIp = await anonymizeProxy("http://" + ip);
   const proxyFlag = `--proxy-server=${anonymizedIp}`;
   const newBrowser = await puppeteer.launch({
+    channel: "chrome",
+    userDataDir: PROFILE_DIR,
     headless: !headful,
     args: [
+      "--profile-directory=Default",
       "--no-sandbox",
       "--disable-setuid-sandbox",
       "--disable-gpu",
@@ -97,6 +101,8 @@ const addNewBrowser = async (headful: boolean) => {
       proxyFlag,
     ],
   });
+  // Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36
+  // Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36
   browserDict[newBrowser.process().pid] = {
     ip,
     anonymizedIp,
@@ -327,12 +333,17 @@ const puppeteerGetInner = async (
       responseData = await response.buffer();
       responseUrl = await response.url();
       tryCount++;
-      // if (tryCount > 0) console.log(`try number ${tryCount}`);
+      if (tryCount > 0) console.log(`try number ${tryCount}`);
     }
-    if (responseBody.includes("challenge-running")) {
+    if (
+      responseBody.includes("challenge-running") ||
+      responseBody.includes('<span id="challenge-error-text">')
+    ) {
       const error = new Error(`Unable to beat challenge for url ${url}`);
-
-      return await conclude(false, undefined);
+      console.error(`${error.toString()}, removing it from the pool now.`);
+      // await page.screenshot({ path: "cf.png", fullPage: true });
+      await removeBrowser(currBrowser, headful, url, error);
+      return await conclude(true, undefined);
     }
     // if (tryCount > 0) console.log(`Beat challenge after ${tryCount} tries`);
     // responseHeaders = await response.headers();

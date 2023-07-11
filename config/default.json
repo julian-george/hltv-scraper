@@ -14,7 +14,7 @@
   "browsers": {
     "limit": 1,
     "numHeadful": 1,
-    "maxChallengeAttempts": 16,
+    "maxChallengeAttempts": 12,
     "forceHeadful": true,
     "forceHeadless": false,
     "scrapeDelay": 750,
