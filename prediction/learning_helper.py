@@ -5,7 +5,7 @@ from processing_helper import quantize_time
 from datetime import datetime
 
 
-delete_keywords = ["map_id", "map_score"]
+delete_keywords = ["map_id", "map_score", "stdev", "wonduels"]
 
 # when rating 2.0 starts applying (March 2016)
 truncation_date = 1456815600

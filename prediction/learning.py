@@ -144,16 +144,14 @@ num_features = X_train.shape[1]
 
 
 def build_model(hp=None, normalize=True):
-    default_layer_size_diff = 0
+    default_layer_size_diff = 10
     layer_size_diff = (
         hp.Choice(
             "layer_size_diff",
             [
-                -20,
-                -10,
-                0,
                 10,
                 20,
+                30,
             ],
         )
         if hp
@@ -161,20 +159,14 @@ def build_model(hp=None, normalize=True):
     )
     layer_size = num_features + layer_size_diff
 
-    default_layer_num = 6
+    default_layer_num = 3
     layer_num = (
         hp.Choice(
             "layer_num",
             [
                 2,
-                3,
                 4,
-                5,
                 6,
-                7,
-                8,
-                10,
-                12,
             ],
         )
         if hp
@@ -193,20 +185,15 @@ def build_model(hp=None, normalize=True):
     for l_i in range(layer_num):
         layer_list.append(keras.layers.Dense(layer_size, activation_function))
 
-    layer_list.append(keras.layers.Dense(2, activation="softmax"))
+    layer_list.append(keras.layers.Dense(1, activation="sigmoid"))
     model = keras.Sequential(layer_list)
     model.build()
-    default_learning_rate = 0.001
+    default_learning_rate = 0.0005
     # learning_rate = default_learning_rate
     learning_rate = (
         hp.Choice(
             "learning_rate",
-            [
-                0.005,
-                0.0025,
-                0.001,
-                0.0005,
-            ],
+            [0.001, 0.0005, 0.0001, 0.00005, 0.00001],
         )
         if hp
         else default_learning_rate
@@ -214,14 +201,11 @@ def build_model(hp=None, normalize=True):
     opt = keras.optimizers.Adam(learning_rate=learning_rate)
     model.compile(
         optimizer=opt,
-        loss="sparse_categorical_crossentropy",
-        metrics=[
-            keras.metrics.SparseCategoricalAccuracy(name="acc"),
-            # keras.metrics.F1Score(),
-        ],
+        loss=keras.losses.mean_absolute_error,
+        metrics=["accuracy"],
         weighted_metrics=[
-            keras.losses.sparse_categorical_crossentropy,
-            keras.metrics.sparse_categorical_accuracy,
+            # keras.losses.sparse_categorical_crossentropy,
+            # keras.metrics.sparse_categorical_accuracy,
         ],
     )
     model.summary()
@@ -248,7 +232,7 @@ for i in range(1):
         validation_split=validation_split,
         epochs=epoch_num,
         callbacks=[
-            tf.keras.callbacks.EarlyStopping(monitor="val_acc", patience=3),
+            tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3),
             tf.keras.callbacks.CSVLogger("metrics.csv"),
         ],
         # sample_weight=X_train_wights,
@@ -272,6 +256,23 @@ model_path = "./prediction_model"
 
 print("Saving Model")
 model.save(model_path)
+
+# hyperparam tuning
+
+# tuner = keras_tuner.Hyperband(build_model, objective="val_loss")
+# tuner.search(
+#     X_train,
+#     y_train,
+#     epochs=epoch_num,
+#     batch_size=batch_size,
+#     validation_split=validation_split,
+#     callbacks=[tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3)],
+#     sample_weight=X_train_weights,
+# )
+# best_model = tuner.get_best_models()[0]
+# print("Saving Tuned Model")
+# best_model.save(model_path)
+
 
 # base_line_loss = np.min(history.history["val_loss"])
 # loss_threshold = 0.005
@@ -351,17 +352,3 @@ model.save(model_path)
 # )
 
 # model_for_pruning.save(model_path)
-
-tuner = keras_tuner.Hyperband(build_model, objective="val_loss")
-tuner.search(
-    X_train,
-    y_train,
-    epochs=epoch_num,
-    batch_size=batch_size,
-    validation_split=validation_split,
-    callbacks=[tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3)],
-    sample_weight=X_train_weights,
-)
-best_model = tuner.get_best_models()[0]
-print("Saving Model")
-best_model.save(model_path)
