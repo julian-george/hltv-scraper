@@ -185,7 +185,7 @@ def build_model(hp=None, normalize=True):
     for l_i in range(layer_num):
         layer_list.append(keras.layers.Dense(layer_size, activation_function))
 
-    layer_list.append(keras.layers.Dense(1, activation="sigmoid"))
+    layer_list.append(keras.layers.Dense(2, activation="softmax"))
     model = keras.Sequential(layer_list)
     model.build()
     default_learning_rate = 0.0005
@@ -201,11 +201,11 @@ def build_model(hp=None, normalize=True):
     opt = keras.optimizers.Adam(learning_rate=learning_rate)
     model.compile(
         optimizer=opt,
-        loss=keras.losses.mean_absolute_error,
+        loss=keras.losses.sparse_categorical_crossentropy,
         metrics=["accuracy"],
         weighted_metrics=[
-            # keras.losses.sparse_categorical_crossentropy,
-            # keras.metrics.sparse_categorical_accuracy,
+            keras.losses.sparse_categorical_crossentropy,
+            keras.metrics.sparse_categorical_accuracy,
         ],
     )
     model.summary()
