@@ -87,11 +87,11 @@ export const scrapeResults = async ($: CheerioAPI, resultsUrl: string) => {
   }
   const resultStart = Date.now();
   // For debug: if you ever want to test matches sequentially
-  // for (const executor of resultExecutors) {
-  //   await executor();
-  // }
-  const resultPromises = resultExecutors.map((executor) => executor());
-  await Promise.all(resultPromises);
+  for (const executor of resultExecutors) {
+    await executor();
+  }
+  // const resultPromises = resultExecutors.map((executor) => executor());
+  // await Promise.all(resultPromises);
   const resultEnd = Date.now();
   const resultElapsed = Math.round((resultEnd - resultStart) / 10) / 100;
   console.log(
