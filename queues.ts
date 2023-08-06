@@ -18,7 +18,7 @@ Promise.all(onIdlePromises).then(() => onIdle());
 // Called whenever there are no promises in both queues
 const onIdle = async () => {
   // If there are still no promises in both queues after this delay, the process is probably done
-  await delay(5000);
+  await delay(10000);
   if (
     getQueue.pending == 0 &&
     getQueue.size == 0 &&
