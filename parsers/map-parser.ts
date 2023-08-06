@@ -75,98 +75,98 @@ const parseMap = async (
       pickedBy = "teamOne";
     }
   }
-  const mapPerformanceLink = $(
-    ".stats-top-menu-item-link:contains('Performance')"
-  )[0];
-  if (!mapPerformanceLink) {
-    console.log("No map performance link for map ID " + mapId);
-    return null;
-  } else {
-    let firstTeamStats = null;
-    let secondTeamStats = null;
-    const mapPerformanceUrl = mapPerformanceLink.attribs["href"];
-    const mapPerformancePage = !CACHED
-      ? await puppeteerGet(mapPerformanceUrl, mapUrl, true)
-      : fs.readFileSync("cached/map-performance-page.html");
-    if (!fs.existsSync("cached/map-performance-page.html")) {
-      fs.writeFile(
-        "cached/map-performance-page.html",
-        mapPerformancePage,
-        (err) => {
-          if (err) throw err;
-        }
-      );
+  // const mapPerformanceLink = $(
+  //   ".stats-top-menu-item-link:contains('Performance')"
+  // )[0];
+  // if (!mapPerformanceLink) {
+  //   console.log("No map performance link for map ID " + mapId);
+  //   return null;
+  // } else {
+  let firstTeamStats = null;
+  let secondTeamStats = null;
+  // const mapPerformanceUrl = mapPerformanceLink.attribs["href"];
+  // const mapPerformancePage = !CACHED
+  //   ? await puppeteerGet(mapPerformanceUrl, mapUrl, true)
+  //   : fs.readFileSync("cached/map-performance-page.html");
+  // if (!fs.existsSync("cached/map-performance-page.html")) {
+  //   fs.writeFile(
+  //     "cached/map-performance-page.html",
+  //     mapPerformancePage,
+  //     (err) => {
+  //       if (err) throw err;
+  //     }
+  //   );
+  // }
+  // if (!mapPerformancePage) {
+  //   console.log("No map performance page found for map ID: " + mapId);
+  // } else {
+  // ({ firstTeamStats, secondTeamStats } = await parseMapPerformance(
+  //   load(mapPerformancePage)
+  // ));
+  firstTeamStats = {};
+  secondTeamStats = {};
+  players = Object.keys(firstTeamStats).concat(Object.keys(secondTeamStats));
+  const tStatRows = $("table.tstats > tbody > tr").toArray();
+  const ctStatRows = $("table.ctstats > tbody > tr").toArray();
+  const allRows = [...tStatRows, ...ctStatRows];
+  for (let i = 0; i < allRows.length; i++) {
+    const statAttr = i < tStatRows.length ? "tStats" : "ctStats";
+    const currRow = $(allRows[i]);
+    const playerId = currRow
+      .find("td > div.flag-align > a")[0]
+      .attribs["href"].split("/")[3]
+      .toString();
+    const statObj = {
+      //@ts-ignore
+      kills: Number(currRow.find(".st-kills")[0].childNodes[0].data),
+      hsKills: Number(
+        currRow
+          .find(".st-kills > span")
+          .text()
+          .replace(/[^0-9\.-]+/g, "")
+      ),
+      // @ts-ignore
+      assists: Number(currRow.find(".st-assists")[0].childNodes[0].data),
+      flashAssists: Number(
+        currRow
+          .find(".st-assists > span")
+          .text()
+          .replace(/[^0-9\.-]+/g, "")
+      ),
+      deaths: Number(currRow.find(".st-deaths").text()),
+      kast:
+        Math.round(
+          Number(currRow.find(".st-kdratio").text().replace("%", "")) * 10
+        ) / 1000 || 0,
+      adr: Number(currRow.find(".st-adr").text()) || 0,
+      fkDiff: Number(
+        currRow
+          .find(".st-fkdiff")
+          .text()
+          .replace(/[^0-9\.-]+/g, "")
+      ),
+      rating: Number(currRow.find(".st-rating").text()),
+    };
+    if (isNaN(statObj.rating)) {
+      throw new Error("NaN value in player statObj");
     }
-    if (!mapPerformancePage) {
-      console.log("No map performance page found for map ID: " + mapId);
+    if (playerId in firstTeamStats) {
+      firstTeamStats[playerId][statAttr] = statObj;
+    } else if (playerId in secondTeamStats) {
+      secondTeamStats[playerId][statAttr] = statObj;
+    }
+    // }
+    teamOneStats = {};
+    teamTwoStats = {};
+    if (firstWon) {
+      teamOneStats = firstTeamStats;
+      teamTwoStats = secondTeamStats;
     } else {
-      ({ firstTeamStats, secondTeamStats } = await parseMapPerformance(
-        load(mapPerformancePage)
-      ));
-      players = Object.keys(firstTeamStats).concat(
-        Object.keys(secondTeamStats)
-      );
-      const tStatRows = $("table.tstats > tbody > tr").toArray();
-      const ctStatRows = $("table.ctstats > tbody > tr").toArray();
-      const allRows = [...tStatRows, ...ctStatRows];
-      for (let i = 0; i < allRows.length; i++) {
-        const statAttr = i < tStatRows.length ? "tStats" : "ctStats";
-        const currRow = $(allRows[i]);
-        const playerId = currRow
-          .find("td > div.flag-align > a")[0]
-          .attribs["href"].split("/")[3]
-          .toString();
-        const statObj = {
-          //@ts-ignore
-          kills: Number(currRow.find(".st-kills")[0].childNodes[0].data),
-          hsKills: Number(
-            currRow
-              .find(".st-kills > span")
-              .text()
-              .replace(/[^0-9\.-]+/g, "")
-          ),
-          // @ts-ignore
-          assists: Number(currRow.find(".st-assists")[0].childNodes[0].data),
-          flashAssists: Number(
-            currRow
-              .find(".st-assists > span")
-              .text()
-              .replace(/[^0-9\.-]+/g, "")
-          ),
-          deaths: Number(currRow.find(".st-deaths").text()),
-          kast:
-            Math.round(
-              Number(currRow.find(".st-kdratio").text().replace("%", "")) * 10
-            ) / 1000 || 0,
-          adr: Number(currRow.find(".st-adr").text()) || 0,
-          fkDiff: Number(
-            currRow
-              .find(".st-fkdiff")
-              .text()
-              .replace(/[^0-9\.-]+/g, "")
-          ),
-          rating: Number(currRow.find(".st-rating").text()),
-        };
-        if (isNaN(statObj.rating)) {
-          throw new Error("NaN value in player statObj");
-        }
-        if (playerId in firstTeamStats) {
-          firstTeamStats[playerId][statAttr] = statObj;
-        } else if (playerId in secondTeamStats) {
-          secondTeamStats[playerId][statAttr] = statObj;
-        }
-      }
-      teamOneStats = {};
-      teamTwoStats = {};
-      if (firstWon) {
-        teamOneStats = firstTeamStats;
-        teamTwoStats = secondTeamStats;
-      } else {
-        teamOneStats = secondTeamStats;
-        teamTwoStats = firstTeamStats;
-      }
+      teamOneStats = secondTeamStats;
+      teamTwoStats = firstTeamStats;
     }
   }
+  // }
   if (
     _.isEmpty(players) ||
     _.isEmpty(teamOneStats) ||
