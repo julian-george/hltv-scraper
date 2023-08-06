@@ -104,9 +104,15 @@ export const parseMatch = async (
       .toArray()
       .slice(0, CACHED ? 1 : PLAYER_LIMIT);
     // const plfayersStartTime = Date.now();
-    for (const playerLink of playerLinks) {
+    for (let i = 0; i < playerLinks.length; i++) {
+      const playerLink = playerLinks[i];
       const playerUrl = playerLink.attribs["href"];
       const playerId = Number(playerUrl.split("/")[2]);
+      if (i < 5) {
+        players.firstTeam.push(playerId);
+      } else {
+        players.secondTeam.push(playerId);
+      }
       const playerExecutor = async () => {
         const player = await getPlayerByHltvId(playerId);
         if (player) {
@@ -235,7 +241,8 @@ export const parseMatch = async (
                 mapUrl,
                 picks[mapId],
                 i,
-                date
+                date,
+                players
               )
                 .catch((err) => {
                   const errMessage =

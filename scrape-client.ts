@@ -89,7 +89,7 @@ const addNewBrowser = async (headful: boolean) => {
   const proxyFlag = `--proxy-server=${anonymizedIp}`;
   const newBrowser = await puppeteer.launch({
     channel: "chrome",
-    userDataDir: PROFILE_DIR,
+    // userDataDir: PROFILE_DIR,
     headless: !headful,
     args: [
       "--profile-directory=Default",

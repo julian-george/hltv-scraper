@@ -15,7 +15,8 @@ const parseMap = async (
   mapUrl: string,
   pickedBy: string,
   mapNum: number,
-  date: Date
+  date: Date,
+  players: { firstTeam: number[]; secondTeam: number[] }
 ) => {
   const hltvId = mapId;
   let mapType = null;
@@ -50,7 +51,7 @@ const parseMap = async (
   let teamTwoRanking = null;
   let teamOneStats = null;
   let teamTwoStats = null;
-  let players = null;
+  // let players = null;
   const firstWon =
     Number($(scoreContainer.childNodes[0]).text()) >=
     Number($(scoreContainer.childNodes[2]).text());
@@ -104,8 +105,14 @@ const parseMap = async (
   //   load(mapPerformancePage)
   // ));
   firstTeamStats = {};
+  for (const playerId of players.firstTeam) {
+    firstTeamStats[playerId] = {};
+  }
   secondTeamStats = {};
-  players = Object.keys(firstTeamStats).concat(Object.keys(secondTeamStats));
+  for (const playerId of players.secondTeam) {
+    secondTeamStats[playerId] = {};
+  }
+  // players = Object.keys(firstTeamStats).concat(Object.keys(secondTeamStats));
   const tStatRows = $("table.tstats > tbody > tr").toArray();
   const ctStatRows = $("table.ctstats > tbody > tr").toArray();
   const allRows = [...tStatRows, ...ctStatRows];
@@ -183,8 +190,8 @@ const parseMap = async (
     teamTwoRanking,
     teamOneStats,
     teamTwoStats,
-    players,
     pickedBy,
+    players: players.firstTeam.concat(players.secondTeam),
     mapNum,
     date,
   };
