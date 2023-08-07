@@ -157,6 +157,7 @@ def market_bet(prediction, market_element, bet_browser):
     if (
         prediction[1] >= underdog_threshold
         and weighted_prediction(prediction[1]) >= home_odds
+        and away_odds > 0.05
     ):
         home_win = True
         betted_odds = home_odds
@@ -167,6 +168,7 @@ def market_bet(prediction, market_element, bet_browser):
     elif (
         prediction[0] >= underdog_threshold
         and weighted_prediction(prediction[0]) >= away_odds
+        and away_odds > 0.05
     ):
         away_button.click()
         print(
@@ -264,7 +266,6 @@ def match_bet(predictions_dict, bet_url, num_maps, bet_browser=None):
             market_element_dict[market_title] = market_element
 
     successful_bets = {}
-
     for title, element in market_element_dict.items():
         # market_bets.append(
         #     threading.Thread(
