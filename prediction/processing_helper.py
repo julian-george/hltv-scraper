@@ -291,8 +291,8 @@ def generate_round_rating_stats(
     avg_ratings = {suffix: {"t": [], "ct": []} for suffix in team_suffixes}
     std_ratings = {suffix: {"t": [], "ct": []} for suffix in team_suffixes}
     # total_wonduels = {suffix: 0 for suffix in team_suffixes}
-    avg_awpkills = {suffix: [] for suffix in team_suffixes}
-    avg_firstkills = {suffix: [] for suffix in team_suffixes}
+    # avg_awpkills = {suffix: [] for suffix in team_suffixes}
+    # avg_firstkills = {suffix: [] for suffix in team_suffixes}
     avg_twinrate = {suffix: [] for suffix in team_suffixes}
     avg_ctwinrate = {suffix: [] for suffix in team_suffixes}
     avg_otwinrate = {suffix: [] for suffix in team_suffixes}
@@ -300,14 +300,14 @@ def generate_round_rating_stats(
     for player_id, player_stats in individual_stats_dict.items():
         team_key = "team_one" if player_id in team_one_ids else "team_two"
         # total_wonduels[team_key] += player_stats["wonduels"]
-        avg_awpkills[team_key].append(np.mean(player_stats["awp"]))
-        avg_firstkills[team_key].append(np.mean(player_stats["firstKill"]))
+        # avg_awpkills[team_key].append(np.mean(player_stats["awp"]))
+        # avg_firstkills[team_key].append(np.mean(player_stats["firstKill"]))
         avg_twinrate[team_key].append(np.mean(player_stats["twinrate"]))
         avg_ctwinrate[team_key].append(np.mean(player_stats["ctwinrate"]))
         avg_otwinrate[team_key].append(np.mean(player_stats["otwinrate"]))
         for side in game_sides:
             avg_kasts[team_key][side].append(np.mean(player_stats["kast"][side]))
-            avg_fkdiffs[team_key][side].append(np.mean(player_stats["fkdiff"][side]))
+            avg_fkdiffs[team_key][side].append(np.mean(player_stats["fkDiff"][side]))
             avg_ratings[team_key][side].append(np.mean(player_stats["rating"][side]))
             std_ratings[team_key][side].append(np.std(player_stats["rating"][side]))
 
@@ -316,8 +316,8 @@ def generate_round_rating_stats(
 
     for suffix in team_suffixes:
         # results_dict[f"total_wonduels_{suffix}"] = np.sum(total_wonduels[suffix])
-        results_dict[f"total_avg_awpkills_{suffix}"] = np.sum(avg_awpkills[suffix])
-        results_dict[f"total_avg_firstkills_{suffix}"] = np.sum(avg_firstkills[suffix])
+        # results_dict[f"total_avg_awpkills_{suffix}"] = np.sum(avg_awpkills[suffix])
+        # results_dict[f"total_avg_firstkills_{suffix}"] = np.sum(avg_firstkills[suffix])
         results_dict[f"total_avg_twinrate_{suffix}"] = np.sum(avg_twinrate[suffix])
         results_dict[f"total_avg_ctwinrate_{suffix}"] = np.sum(avg_ctwinrate[suffix])
         results_dict[f"total_avg_otwinrate_{suffix}"] = np.sum(avg_otwinrate[suffix])
@@ -342,6 +342,9 @@ def generate_round_rating_stats(
             )
             results_dict[f"total_avg_kast_{side}_{suffix}"] = np.sum(
                 avg_kasts[suffix][side]
+            )
+            results_dict[f"total_avg_fkdiff_{side}_{suffix}"] = np.sum(
+                avg_fkdiffs[suffix][side]
             )
 
     return results_dict
@@ -607,10 +610,12 @@ def process_maps(maps_to_process, frame_lock, feature_data, thread_idx):
         # print(f"[{thread_idx}] Processing map ID:", curr_map["hltvId"])
         w = generate_data_point(curr_map)
         if w == None or len(w.keys()) < feature_data.frame.shape[1]:
-            # print(
-            #     "Partial datapoint for map id",
-            #     w["map_id"],
-            # )
+            if w == None:
+                print("None datapoint")
+            else:
+                print(
+                    "Partial datapoint for map id", w["map_id"], "with length", len(w)
+                )
             continue
         with frame_lock:
             feature_data.frame.loc[len(feature_data.frame.index)] = w
