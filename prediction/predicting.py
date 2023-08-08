@@ -103,7 +103,7 @@ def predict_match(match, map_infos=None, same_order=True, ignore_cache=False):
     for i, map_info in enumerate(map_infos):
         w = generate_data_point(match, played=False, map_info=map_info)
         processed_w = process_frame(pd.DataFrame([w]))[0]
-        print(processed_w)
+        # print(processed_w)
         # with open("t.txt", "w") as f:
         #     f.write("\n".join(sorted(list(processed_w.columns))))
         processed_w.to_csv(f"w_{i}_unplayed.csv")
