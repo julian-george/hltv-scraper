@@ -121,138 +121,145 @@ def generate_round_rating_stats(
     team_two_apart_maps = 0
     # add stats to list for each player
     for performance in performances:
-        for i, player_id in enumerate(team_one_ids + team_two_ids):
-            team_key = None
-            away_key = None
-            if player_id in performance["teamOneStats"].keys():
-                team_key = "teamOne"
-                away_key = "teamTwo"
-            elif player_id in performance["teamTwoStats"].keys():
-                team_key = "teamTwo"
-                away_key = "teamOne"
-            if team_key != None:
-                home_score = (
-                    performance["score"][team_key]["ct"]
-                    + performance["score"][team_key]["t"]
-                    + performance["score"][team_key]["ot"]
-                )
-                away_score = (
-                    performance["score"][away_key]["ct"]
-                    + performance["score"][away_key]["t"]
-                    + performance["score"][away_key]["ot"]
-                )
-                if player_id in team_one_ids:
-                    if not "timetogether_team_one" in results_dict:
-                        if (
-                            intersection_length(
-                                team_one_ids, performance[f"{team_key}Stats"].keys()
-                            )
-                            != 5
-                        ):
-                            team_one_apart_maps += 1
-                        else:
-                            team_one_apart_maps = 0
-                        if team_one_apart_maps >= apart_threshold:
-                            results_dict["timetogether_team_one"] = quantize_timedelta(
-                                raw_date - performance["date"]
-                            )
-                    if not "lastwin_team_one" in results_dict:
-                        if home_score > away_score:
-                            results_dict["lastwin_team_one"] = quantize_timedelta(
-                                raw_date - performance["date"]
-                            )
-                    if not "lastloss_team_one" in results_dict:
-                        if away_score > home_score:
-                            results_dict["lastloss_team_one"] = quantize_timedelta(
-                                raw_date - performance["date"]
-                            )
-                elif player_id in team_two_ids:
-                    if not "timetogether_team_two" in results_dict:
-                        if (
-                            intersection_length(
-                                team_two_ids, performance[f"{team_key}Stats"].keys()
-                            )
-                            != 5
-                        ):
-                            team_two_apart_maps += 1
-                        else:
-                            team_two_apart_maps = 0
-                        if team_two_apart_maps >= apart_threshold:
-                            results_dict["timetogether_team_two"] = quantize_timedelta(
-                                raw_date - performance["date"]
-                            )
-                    if not "lastwin_team_two" in results_dict:
-                        if home_score > away_score:
-                            results_dict["lastwin_team_two"] = quantize_timedelta(
-                                raw_date - performance["date"]
-                            )
-                    if not "lastloss_team_two" in results_dict:
-                        if away_score > home_score:
-                            results_dict["lastloss_team_two"] = quantize_timedelta(
-                                raw_date - performance["date"]
-                            )
+        try:
+            for i, player_id in enumerate(team_one_ids + team_two_ids):
+                team_key = None
+                away_key = None
+                if player_id in performance["teamOneStats"].keys():
+                    team_key = "teamOne"
+                    away_key = "teamTwo"
+                elif player_id in performance["teamTwoStats"].keys():
+                    team_key = "teamTwo"
+                    away_key = "teamOne"
+                if team_key != None:
+                    home_score = (
+                        performance["score"][team_key]["ct"]
+                        + performance["score"][team_key]["t"]
+                        + performance["score"][team_key]["ot"]
+                    )
+                    away_score = (
+                        performance["score"][away_key]["ct"]
+                        + performance["score"][away_key]["t"]
+                        + performance["score"][away_key]["ot"]
+                    )
+                    if player_id in team_one_ids:
+                        if not "timetogether_team_one" in results_dict:
+                            if (
+                                intersection_length(
+                                    team_one_ids, performance[f"{team_key}Stats"].keys()
+                                )
+                                != 5
+                            ):
+                                team_one_apart_maps += 1
+                            else:
+                                team_one_apart_maps = 0
+                            if team_one_apart_maps >= apart_threshold:
+                                results_dict[
+                                    "timetogether_team_one"
+                                ] = quantize_timedelta(raw_date - performance["date"])
+                        if not "lastwin_team_one" in results_dict:
+                            if home_score > away_score:
+                                results_dict["lastwin_team_one"] = quantize_timedelta(
+                                    raw_date - performance["date"]
+                                )
+                        if not "lastloss_team_one" in results_dict:
+                            if away_score > home_score:
+                                results_dict["lastloss_team_one"] = quantize_timedelta(
+                                    raw_date - performance["date"]
+                                )
+                    elif player_id in team_two_ids:
+                        if not "timetogether_team_two" in results_dict:
+                            if (
+                                intersection_length(
+                                    team_two_ids, performance[f"{team_key}Stats"].keys()
+                                )
+                                != 5
+                            ):
+                                team_two_apart_maps += 1
+                            else:
+                                team_two_apart_maps = 0
+                            if team_two_apart_maps >= apart_threshold:
+                                results_dict[
+                                    "timetogether_team_two"
+                                ] = quantize_timedelta(raw_date - performance["date"])
+                        if not "lastwin_team_two" in results_dict:
+                            if home_score > away_score:
+                                results_dict["lastwin_team_two"] = quantize_timedelta(
+                                    raw_date - performance["date"]
+                                )
+                        if not "lastloss_team_two" in results_dict:
+                            if away_score > home_score:
+                                results_dict["lastloss_team_two"] = quantize_timedelta(
+                                    raw_date - performance["date"]
+                                )
 
-                for stat in sided_stats:
-                    for side in game_sides:
-                        individual_stats_dict[player_id][stat][side].append(
-                            performance[f"{team_key}Stats"][player_id][f"{side}Stats"][
-                                stat
-                            ]
-                        )
-                # for stat in duel_stats:
-                #     individual_stats_dict[player_id][stat].append(
-                #         np.sum(
-                #             list(
-                #                 performance[f"{team_key}Stats"][player_id]["duelMap"][
-                #                     stat
-                #                 ].values()
-                #             )
-                #         )
-                #     )
-                # for opponent_id, wins in performance[f"{team_key}Stats"][player_id][
-                #     "duelMap"
-                # ]["all"].items():
-                #     if (
-                #         i <= 4
-                #         and opponent_id in team_two_ids
-                #         or i > 4
-                #         and opponent_id in team_one_ids
-                #     ):
-                #         individual_stats_dict[player_id]["wonduels"] += wins
-                t_winrate = performance["score"][f"{team_key}"]["t"] / (
-                    performance["score"][f"{team_key}"]["t"]
-                    + performance["score"][f"{away_key}"]["ct"]
-                )
-                individual_stats_dict[player_id]["twinrate"].append(t_winrate)
-                ct_winrate = performance["score"][f"{team_key}"]["ct"] / (
-                    performance["score"][f"{team_key}"]["ct"]
-                    + performance["score"][f"{away_key}"]["t"]
-                )
-                individual_stats_dict[player_id]["ctwinrate"].append(ct_winrate)
-                ot_winrate = performance["score"][f"{team_key}"]["ot"] + 1 / (
-                    performance["score"][f"{team_key}"]["ot"]
-                    + performance["score"][f"{away_key}"]["ot"]
-                    + 1
-                )
-                individual_stats_dict[player_id]["otwinrate"].append(ot_winrate)
-                for category, condition in condition_dict.items():
-                    if condition(performance, player_id):
-                        category_stats_dict[player_id][category]["round"]["ct"].append(
-                            performance["score"][team_key]["ct"]
-                        )
-                        category_stats_dict[player_id][category]["round"]["t"].append(
-                            performance["score"][team_key]["t"]
-                        )
-                        category_stats_dict[player_id][category]["rating"]["ct"].append(
-                            performance[team_key + "Stats"][player_id]["ctStats"][
-                                "rating"
-                            ]
-                        )
-                        category_stats_dict[player_id][category]["rating"]["t"].append(
-                            performance[team_key + "Stats"][player_id]["tStats"][
-                                "rating"
-                            ]
-                        )
+                    for stat in sided_stats:
+                        for side in game_sides:
+                            individual_stats_dict[player_id][stat][side].append(
+                                performance[f"{team_key}Stats"][player_id][
+                                    f"{side}Stats"
+                                ][stat]
+                            )
+                    # for stat in duel_stats:
+                    #     individual_stats_dict[player_id][stat].append(
+                    #         np.sum(
+                    #             list(
+                    #                 performance[f"{team_key}Stats"][player_id]["duelMap"][
+                    #                     stat
+                    #                 ].values()
+                    #             )
+                    #         )
+                    #     )
+                    # for opponent_id, wins in performance[f"{team_key}Stats"][player_id][
+                    #     "duelMap"
+                    # ]["all"].items():
+                    #     if (
+                    #         i <= 4
+                    #         and opponent_id in team_two_ids
+                    #         or i > 4
+                    #         and opponent_id in team_one_ids
+                    #     ):
+                    #         individual_stats_dict[player_id]["wonduels"] += wins
+                    t_winrate = performance["score"][f"{team_key}"]["t"] / (
+                        performance["score"][f"{team_key}"]["t"]
+                        + performance["score"][f"{away_key}"]["ct"]
+                    )
+                    individual_stats_dict[player_id]["twinrate"].append(t_winrate)
+                    ct_winrate = performance["score"][f"{team_key}"]["ct"] / (
+                        performance["score"][f"{team_key}"]["ct"]
+                        + performance["score"][f"{away_key}"]["t"]
+                    )
+                    individual_stats_dict[player_id]["ctwinrate"].append(ct_winrate)
+                    ot_winrate = performance["score"][f"{team_key}"]["ot"] + 1 / (
+                        performance["score"][f"{team_key}"]["ot"]
+                        + performance["score"][f"{away_key}"]["ot"]
+                        + 1
+                    )
+                    individual_stats_dict[player_id]["otwinrate"].append(ot_winrate)
+                    for category, condition in condition_dict.items():
+                        if condition(performance, player_id):
+                            category_stats_dict[player_id][category]["round"][
+                                "ct"
+                            ].append(performance["score"][team_key]["ct"])
+                            category_stats_dict[player_id][category]["round"][
+                                "t"
+                            ].append(performance["score"][team_key]["t"])
+                            category_stats_dict[player_id][category]["rating"][
+                                "ct"
+                            ].append(
+                                performance[team_key + "Stats"][player_id]["ctStats"][
+                                    "rating"
+                                ]
+                            )
+                            category_stats_dict[player_id][category]["rating"][
+                                "t"
+                            ].append(
+                                performance[team_key + "Stats"][player_id]["tStats"][
+                                    "rating"
+                                ]
+                            )
+        except:
+            print("Error processing performance from map", performance["hltvId"])
     # get player-wise averages
     for player_id, player_stats in category_stats_dict.items():
         team_suffix = "team_one" if player_id in team_one_ids else "team_two"

@@ -105,13 +105,13 @@ const parseMap = async (
   //   load(mapPerformancePage)
   // ));
   firstTeamStats = {};
-  for (const playerId of players.firstTeam) {
-    firstTeamStats[playerId] = {};
-  }
+  // for (const playerId of players.firstTeam) {
+  //   firstTeamStats[playerId] = {};
+  // }
   secondTeamStats = {};
-  for (const playerId of players.secondTeam) {
-    secondTeamStats[playerId] = {};
-  }
+  // for (const playerId of players.secondTeam) {
+  //   secondTeamStats[playerId] = {};
+  // }
   // players = Object.keys(firstTeamStats).concat(Object.keys(secondTeamStats));
   const tStatRows = $("table.tstats > tbody > tr").toArray();
   const ctStatRows = $("table.ctstats > tbody > tr").toArray();

@@ -103,6 +103,7 @@ def predict_match(match, map_infos=None, same_order=True, ignore_cache=False):
     for i, map_info in enumerate(map_infos):
         w = generate_data_point(match, played=False, map_info=map_info)
         processed_w = process_frame(pd.DataFrame([w]))[0]
+        print(processed_w)
         # with open("t.txt", "w") as f:
         #     f.write("\n".join(sorted(list(processed_w.columns))))
         processed_w.to_csv(f"w_{i}_unplayed.csv")
@@ -151,6 +152,7 @@ def get_unplayed_match_by_team_names(team_one_name, team_two_name, date=None):
             jellyfish.jaro_similarity(match_title, draft_title_1),
             jellyfish.jaro_similarity(match_title, draft_title_2),
         )
+        # print(match_title, draft_title_1, draft_title_2, curr_similarity)
         if curr_similarity > best_similarity and curr_similarity > threshold_similarity:
             if date == None or abs(date - unplayed["date"]) < unplayed_threshold:
                 best_match = unplayed
