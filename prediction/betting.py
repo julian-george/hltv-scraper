@@ -488,7 +488,7 @@ def make_bets(browser=None):
     #     betted_markets = map_thread.get()
     #     confirm_bet(match["hltvId"], betted_markets)
 
-    # browser.close()
+    browser.close()
     return sleep_length
 
 
