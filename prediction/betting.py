@@ -15,7 +15,7 @@ from selenium.webdriver.common.by import By
 from selenium.common.exceptions import StaleElementReferenceException
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.core.utils import ChromeType
+
 
 from predicting import (
     predict_match,
@@ -37,9 +37,7 @@ max_bet_amount = 2000
 total_balance = None
 
 
-service = Service(
-    executable_path=ChromeDriverManager(version="114.0.5735.90").install()
-)
+# service = Service(executable_path=ChromeDriverManager().install())
 # service = None
 options = ChromeOptions()
 options.add_argument("--no-sandbox")
@@ -58,7 +56,9 @@ def generic_wait(browser):
 
 def login(browser):
     browser.get("https://thunderpick.io/en/esports?login=true")
-    google_ele = browser.find_element(By.CSS_SELECTOR, ".social-btn--google")
+    google_ele = generic_wait(browser).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, ".social-btn--google"))
+    )
     google_ele.click()
     sleep(1)
     WebDriverWait(browser, 30, ignored_exceptions=ignored_exceptions).until(
@@ -516,7 +516,9 @@ def make_bets(browser=None):
     return sleep_length
 
 
-browser = Chrome(options=options)
+browser = Chrome(
+    options=options, driver_executable_path=ChromeDriverManager().install()
+)
 while True:
     sleep_length = 60 * 30
     try:
