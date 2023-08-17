@@ -489,7 +489,7 @@ def make_bets(browser=None):
             for k, v in market_prediction_dict.items()
             if not k in match["betted"]
             or match["betted"][k] == None
-            or match["betted"][k]["try_num"] < betting_odds_attempts
+            or match["betted"][k].get("try_num", 0) < betting_odds_attempts
         }
         # map_threads.append(
         #     map_pool.apply_async(match_bet, (market_prediction_dict, bet_url)).get()
