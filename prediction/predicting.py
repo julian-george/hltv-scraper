@@ -128,7 +128,7 @@ def get_match_by_id(id):
 
 
 unplayed_threshold = timedelta(days=0, hours=7, minutes=0)
-threshold_similarity = 0.7
+threshold_similarity = 0.75
 
 
 def get_unplayed_match_by_team_names(team_one_name, team_two_name, date=None):

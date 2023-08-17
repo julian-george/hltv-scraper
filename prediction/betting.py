@@ -61,6 +61,11 @@ def login(browser):
     google_ele = browser.find_element(By.CSS_SELECTOR, ".social-btn--google")
     google_ele.click()
     sleep(1)
+    WebDriverWait(browser, 30, ignored_exceptions=ignored_exceptions).until(
+        EC.presence_of_element_located(
+            (By.CSS_SELECTOR, "div.thp-info-image__icon-container--success")
+        )
+    )
     generic_wait(browser).until(
         EC.presence_of_element_located((By.CSS_SELECTOR, "div.match-group"))
     )
@@ -97,9 +102,10 @@ site_odd_threshold = 0.02
 
 
 def weighted_prediction(prediction):
-    threshold_distance = confident_threshold - underdog_threshold
-    weight = ((-1 * min(prediction - confident_threshold, 0)) / threshold_distance) + 1
-    return prediction / weight
+    # threshold_distance = confident_threshold - underdog_threshold
+    # weight = ((-1 * min(prediction - confident_threshold, 0)) / threshold_distance) + 1
+    # return prediction / weight
+    return prediction
 
 
 def market_bet(prediction, market_element, bet_browser):
@@ -444,6 +450,7 @@ def make_bets(browser=None):
                 elif right_picked:
                     picked_by = "teamTwo"
                 map_info = {"map_name": map_name, "picked_by": picked_by, "map_num": i}
+                print("New map info", map_info)
                 map_infos.append(map_info)
 
             set_maps(
