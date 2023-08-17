@@ -307,6 +307,10 @@ def match_bet(predictions_dict, bet_url, num_maps, bet_browser=None):
     return successful_bets
 
 
+# number of times to retry betting until favorable odds are found
+betting_odds_attempts = 4
+
+
 def make_bets(browser=None):
     sleep_length = None
     # options.add_argument("--headless")
@@ -483,7 +487,9 @@ def make_bets(browser=None):
         market_prediction_dict = {
             k: v
             for k, v in market_prediction_dict.items()
-            if not k in match["betted"] or not match["betted"][k]
+            if not k in match["betted"]
+            or match["betted"][k] == None
+            or match["betted"][k]["try_num"] < betting_odds_attempts
         }
         # map_threads.append(
         #     map_pool.apply_async(match_bet, (market_prediction_dict, bet_url)).get()
@@ -492,8 +498,14 @@ def make_bets(browser=None):
         betted_markets = match_bet(
             market_prediction_dict, bet_url, match["numMaps"], browser
         )
-        if None in betted_markets.values():
-            sleep_length = 30
+        for market_name, market_dict in betted_markets.items():
+            if market_dict == None:
+                sleep_length = 30
+            elif market_dict["betted_odds"] == None:
+                curr_tries = market_dict["try_num"] or 0
+                betted_markets[market_name]["try_num"] = curr_tries + 1
+                sleep_length = min(sleep_length, 60)
+
         confirm_bet(match["hltvId"], betted_markets)
 
     # for map_thread in map_threads:
