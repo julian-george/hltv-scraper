@@ -431,8 +431,11 @@ def make_bets(browser=None):
             map_infos = []
             browser.get("https://www.hltv.org" + match["matchUrl"])
             print("Page loaded", match["matchUrl"])
-            generic_wait(browser).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "div.mapholder"))
+            print(
+                "wait result",
+                generic_wait(browser).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "div.mapholder"))
+                ),
             )
             mapholders = browser.find_elements(By.CSS_SELECTOR, "div.mapholder")
             print(len(mapholders), "mapholders found")
