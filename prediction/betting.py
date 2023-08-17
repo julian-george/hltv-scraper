@@ -437,7 +437,7 @@ def make_bets(browser=None):
             print("Page loaded", match["matchUrl"])
             print(
                 "wait result",
-                generic_wait(browser).until(
+                WebDriverWait(browser, 10).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, "div.mapholder"))
                 ),
             )
