@@ -430,10 +430,12 @@ def make_bets(browser=None):
             # do this for edge case that only one map is TBA to prevent adding duplicate maps
             map_infos = []
             browser.get("https://www.hltv.org" + match["matchUrl"])
+            print("Page loaded", match["matchUrl"])
             generic_wait(browser).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "div.mapholder"))
             )
             mapholders = browser.find_elements(By.CSS_SELECTOR, "div.mapholder")
+            print(len(mapholders), "mapholders found")
             for i, holder in enumerate(mapholders):
                 map_name = holder.find_element(By.CSS_SELECTOR, "div.mapname").text
                 picked_by = None
