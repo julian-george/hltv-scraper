@@ -188,6 +188,7 @@ def market_bet(prediction, market_element, bet_browser):
             "odds": [home_odds, away_odds],
             "betted_amount": 0,
             "betted_odds": None,
+            "try_num": 0,
         }
     try:
         pending_bet_input = WebDriverWait(
@@ -260,6 +261,7 @@ def match_bet(predictions_dict, bet_url, num_maps, bet_browser=None):
         except Exception:
             print("No market elements")
             # return {}
+    print("Market elements found")
     market_element_dict = {}
     for market_element in market_elements:
         market_title = "Match"
@@ -489,7 +491,10 @@ def make_bets(browser=None):
             for k, v in market_prediction_dict.items()
             if not k in match["betted"]
             or match["betted"][k] == None
-            or match["betted"][k].get("try_num", 0) < betting_odds_attempts
+            or (
+                "try_num" in match["betted"][k]
+                and match["betted"][k]["try_num"] < betting_odds_attempts
+            )
         }
         # map_threads.append(
         #     map_pool.apply_async(match_bet, (market_prediction_dict, bet_url)).get()
