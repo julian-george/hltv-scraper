@@ -249,6 +249,7 @@ def set_maps(matchId, maps):
 
 
 def confirm_bet(matchId, betted_markets):
+    print("confirming", betted_markets)
     unplayed_match = unplayed_matches.find_one({"hltvId": matchId})
     betted_markets = {**unplayed_match["betted"], **betted_markets}
     unplayed_matches.update_one(

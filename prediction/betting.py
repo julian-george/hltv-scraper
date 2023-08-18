@@ -54,6 +54,10 @@ def generic_wait(browser):
     return WebDriverWait(browser, 10, ignored_exceptions=ignored_exceptions)
 
 
+def long_wait(browser):
+    return WebDriverWait(browser, 30, ignored_exceptions=ignored_exceptions)
+
+
 def login(browser):
     browser.get("https://thunderpick.io/en/esports?login=true")
     google_ele = generic_wait(browser).until(
@@ -61,7 +65,7 @@ def login(browser):
     )
     google_ele.click()
     sleep(1)
-    WebDriverWait(browser, 30, ignored_exceptions=ignored_exceptions).until(
+    long_wait(browser).until(
         EC.presence_of_element_located(
             (By.CSS_SELECTOR, "div.thp-info-image__icon-container--success")
         )
@@ -188,12 +192,10 @@ def market_bet(prediction, market_element, bet_browser):
             "odds": [home_odds, away_odds],
             "betted_amount": 0,
             "betted_odds": None,
-            "try_num": 0,
+            # "try_num": 0,
         }
     try:
-        pending_bet_input = WebDriverWait(
-            bet_browser, 30, ignored_exceptions=ignored_exceptions
-        ).until(
+        pending_bet_input = long_wait(browser).until(
             EC.presence_of_element_located(
                 (
                     By.CSS_SELECTOR,
@@ -500,6 +502,7 @@ def make_bets(browser=None):
         #     map_pool.apply_async(match_bet, (market_prediction_dict, bet_url)).get()
         # )
         print("Trying to bet on", match["title"])
+
         betted_markets = match_bet(
             market_prediction_dict, bet_url, match["numMaps"], browser
         )
@@ -507,9 +510,12 @@ def make_bets(browser=None):
             if market_dict == None:
                 sleep_length = 30
             elif market_dict["betted_odds"] == None:
-                curr_tries = market_dict["try_num"] or 0
+                curr_tries = (
+                    (match.get("betted", {}).get(market_name, None)) or {}
+                ).get("try_num", 0)
+                print("Current tries", curr_tries)
                 betted_markets[market_name]["try_num"] = curr_tries + 1
-                sleep_length = min(sleep_length, 60)
+                sleep_length = min(sleep_length, 60) if sleep_length is not None else 60
 
         confirm_bet(match["hltvId"], betted_markets)
 
