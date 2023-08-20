@@ -105,13 +105,13 @@ const parseMap = async (
   //   load(mapPerformancePage)
   // ));
   firstTeamStats = {};
-  // for (const playerId of players.firstTeam) {
-  //   firstTeamStats[playerId] = {};
-  // }
+  for (const playerId of players.firstTeam) {
+    firstTeamStats[playerId] = {};
+  }
   secondTeamStats = {};
-  // for (const playerId of players.secondTeam) {
-  //   secondTeamStats[playerId] = {};
-  // }
+  for (const playerId of players.secondTeam) {
+    secondTeamStats[playerId] = {};
+  }
   // players = Object.keys(firstTeamStats).concat(Object.keys(secondTeamStats));
   const tStatRows = $("table.tstats > tbody > tr").toArray();
   const ctStatRows = $("table.ctstats > tbody > tr").toArray();
@@ -162,23 +162,25 @@ const parseMap = async (
     } else if (playerId in secondTeamStats) {
       secondTeamStats[playerId][statAttr] = statObj;
     }
-    // }
-    teamOneStats = {};
-    teamTwoStats = {};
-    if (firstWon) {
-      teamOneStats = firstTeamStats;
-      teamTwoStats = secondTeamStats;
-    } else {
-      teamOneStats = secondTeamStats;
-      teamTwoStats = firstTeamStats;
-    }
   }
+  // console.log(firstTeamStats, secondTeamStats);
+  teamOneStats = {};
+  teamTwoStats = {};
+  if (firstWon) {
+    teamOneStats = firstTeamStats;
+    teamTwoStats = secondTeamStats;
+  } else {
+    teamOneStats = secondTeamStats;
+    teamTwoStats = firstTeamStats;
+  }
+  // }
   // }
   if (
     _.isEmpty(players) ||
     _.isEmpty(teamOneStats) ||
     _.isEmpty(teamTwoStats)
   ) {
+    console.log(players, teamOneStats, teamTwoStats);
     throw new Error("Empty stats or players for map ID " + hltvId);
   }
   const newMap = {

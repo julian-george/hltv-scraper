@@ -161,7 +161,7 @@ export const scrapeMatches = async ($: CheerioAPI, matchesUrl: string) => {
   }
   const matchStart = Date.now();
   // For debug: if you ever want to test matches sequentially
-  // for (const executor of resultExecutors) {
+  // for (const executor of matchExecutors) {
   //   await executor();
   // }
   const matchPromises = matchExecutors.map((executor) => executor());

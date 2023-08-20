@@ -144,7 +144,7 @@ num_features = X_train.shape[1]
 
 
 def build_model(hp=None, normalize=True):
-    default_layer_size_diff = 10
+    default_layer_size_diff = 30
     layer_size_diff = (
         hp.Choice(
             "layer_size_diff",
@@ -159,7 +159,7 @@ def build_model(hp=None, normalize=True):
     )
     layer_size = num_features + layer_size_diff
 
-    default_layer_num = 3
+    default_layer_num = 6
     layer_num = (
         hp.Choice(
             "layer_num",
