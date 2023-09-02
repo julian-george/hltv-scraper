@@ -506,6 +506,7 @@ def make_bets(browser=None):
         betted_markets = match_bet(
             market_prediction_dict, bet_url, match["numMaps"], browser
         )
+        print("betted_markets", betted_markets)
         for market_name, market_dict in betted_markets.items():
             if market_dict == None:
                 sleep_length = 30
