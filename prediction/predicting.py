@@ -128,7 +128,7 @@ def get_match_by_id(id):
 
 
 unplayed_threshold = timedelta(days=0, hours=7, minutes=0)
-threshold_similarity = 0.75
+threshold_similarity = 0.8
 
 
 def get_unplayed_match_by_team_names(team_one_name, team_two_name, date=None):
@@ -148,6 +148,7 @@ def get_unplayed_match_by_team_names(team_one_name, team_two_name, date=None):
     best_similarity = 0
     for unplayed in all_unplayed:
         match_title = unplayed["title"]
+        # TODO: weigh shared substrings heavily
         curr_similarity = max(
             jellyfish.jaro_similarity(match_title, draft_title_1),
             jellyfish.jaro_similarity(match_title, draft_title_2),
