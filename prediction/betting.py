@@ -103,13 +103,15 @@ def balance_check(browser):
 confident_threshold = 0.65
 underdog_threshold = 0.4
 site_odd_threshold = 0.02
+# minimum value for our model's prediction if we want to bet
+to_bet_threshold = 0.55
 
 
 def weighted_prediction(prediction):
     # threshold_distance = confident_threshold - underdog_threshold
     # weight = ((-1 * min(prediction - confident_threshold, 0)) / threshold_distance) + 1
     # return prediction / weight
-    if prediction < 0.5:
+    if prediction < to_bet_threshold:
         return 0
     return prediction
 
