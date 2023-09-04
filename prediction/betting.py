@@ -109,6 +109,8 @@ def weighted_prediction(prediction):
     # threshold_distance = confident_threshold - underdog_threshold
     # weight = ((-1 * min(prediction - confident_threshold, 0)) / threshold_distance) + 1
     # return prediction / weight
+    if prediction < 0.5:
+        return 0
     return prediction
 
 
