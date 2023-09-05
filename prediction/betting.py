@@ -243,6 +243,7 @@ def market_bet(prediction, market_element, bet_browser):
 
 
 def match_bet(predictions_dict, bet_url, num_maps, bet_browser=None):
+    print("match_bet")
     bet_browser.get(bet_url)
     print("match_bet, get", bet_url)
     market_elements = []
