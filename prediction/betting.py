@@ -245,7 +245,7 @@ def market_bet(prediction, market_element, bet_browser):
 def match_bet(predictions_dict, bet_url, num_maps, bet_browser=None):
     print("match_bet")
     bet_browser.get(bet_url)
-    print("match_bet, get", bet_url)
+    print("GET", bet_url)
     market_elements = []
     if num_maps == 1:
         market_elements.append(
@@ -431,7 +431,7 @@ def make_bets(browser=None):
                 [
                     map_betted
                     for map_betted in match["betted"].values()
-                    if map_betted != None
+                    if map_betted != None and map_betted["betted_odds"] != None
                 ]
             )
             == match["numMaps"]

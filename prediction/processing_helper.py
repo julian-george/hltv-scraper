@@ -122,6 +122,7 @@ def generate_round_rating_stats(
     # add stats to list for each player
     for performance in performances:
         try:
+            assert len(team_one_ids + team_two_ids) == 10
             for i, player_id in enumerate(team_one_ids + team_two_ids):
                 team_key = None
                 away_key = None
@@ -258,8 +259,10 @@ def generate_round_rating_stats(
                                     "rating"
                                 ]
                             )
-        except:
-            print("Error processing performance from map", performance["hltvId"])
+        except Exception as e:
+            print(
+                "Error processing performance from map", performance["hltvId"], ":", e
+            )
     # get player-wise averages
     for player_id, player_stats in category_stats_dict.items():
         team_suffix = "team_one" if player_id in team_one_ids else "team_two"
