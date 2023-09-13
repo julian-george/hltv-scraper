@@ -12,10 +12,9 @@ from betting_helper import generic_wait, long_wait, balance_check
 from betting_match import match_bet
 from predicting import (
     predict_match,
-    confirm_bet,
-    set_maps,
     get_unplayed_match_by_team_names,
 )
+from services.unplayedmatch_service import confirm_bet, set_maps
 
 prediction_threshold = timedelta(minutes=10)
 
@@ -58,7 +57,7 @@ urls_to_skip = []
 betting_odds_attempts = 4
 
 
-def handle_match(bet_url, browser):
+def handle_match(bet_url, browser, sleep_length):
     browser.get(bet_url)
     match_date = None
     now = datetime.now()
@@ -77,10 +76,11 @@ def handle_match(bet_url, browser):
     except:
         match_date = now
     if match_date - now > prediction_threshold:
-        print("Past threshold, ending until bet at", bet_url)
         if sleep_length == None:
             sleep_length = (match_date - now).total_seconds() - 600
         # browser.close()
+        print("Past threshold, ending until bet at", bet_url, sleep_length)
+
         return sleep_length
     home_team = (
         generic_wait(browser)
@@ -261,21 +261,29 @@ def make_bets(browser=None):
     match_urls = [url for url in match_urls if not url in urls_to_skip]
 
     for bet_url in match_urls:
-        handle_match(bet_url, browser)
+        handle_match(bet_url, browser, sleep_length)
 
     browser.close()
     return sleep_length
 
 
 def update_wagers(browser):
+    tab_elements = generic_wait(browser).until(
+        EC.presence_of_all_elements_located((By.CLASS_NAME, "navbar-main-tabs__tab"))
+    )
+    wagers_tab = tab_elements[2]
+    wagers_tab.click()
+
+    # navbar-main-tabs__tab
     pass
 
 
 if __name__ == "__main__":
+    # named outer_browser to distinguish itself from inner functions' `browser` variables
     outer_browser = Chrome(
         options=options, driver_executable_path=ChromeDriverManager().install()
     )
-    # prevents mysterious code hangs when you do browser.get
+    # prevents mysterious code hangs sometimes when you do browser.get
     outer_browser.set_page_load_timeout(20)
     while True:
         sleep_length = 60 * 30
