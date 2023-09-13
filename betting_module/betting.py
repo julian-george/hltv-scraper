@@ -32,6 +32,8 @@ options.add_argument("--disable-extensions")
 options.add_argument("--disable-gpu")
 options.add_argument("--start-fullscreen")
 
+sleep_length = None
+
 
 def login(browser):
     browser.get("https://thunderpick.io/en/esports?login=true")
@@ -57,7 +59,8 @@ urls_to_skip = []
 betting_odds_attempts = 4
 
 
-def handle_match(bet_url, browser, sleep_length):
+def handle_match(bet_url, browser):
+    global sleep_length
     browser.get(bet_url)
     match_date = None
     now = datetime.now()
@@ -76,12 +79,13 @@ def handle_match(bet_url, browser, sleep_length):
     except:
         match_date = now
     if match_date - now > prediction_threshold:
+        print(sleep_length)
         if sleep_length == None:
             sleep_length = (match_date - now).total_seconds() - 600
+            print("new sleep length", sleep_length)
         # browser.close()
-        print("Past threshold, ending until bet at", bet_url, sleep_length)
-
-        return sleep_length
+        print("Past threshold, ending until bet at", bet_url)
+        raise Exception()
     home_team = (
         generic_wait(browser)
         .until(
@@ -201,6 +205,7 @@ def handle_match(bet_url, browser, sleep_length):
         if market_dict == None:
             sleep_length = 30
         elif market_dict["betted_odds"] == None:
+            # if it was not betted due to unfavorable odds, increment tries
             curr_tries = ((match.get("betted", {}).get(market_name, None)) or {}).get(
                 "try_num", 0
             )
@@ -212,6 +217,7 @@ def handle_match(bet_url, browser, sleep_length):
 
 
 def make_bets(browser=None):
+    global sleep_length
     sleep_length = None
     # options.add_argument("--headless")
     browser.get("https://thunderpick.io/en/esports/csgo")
@@ -261,10 +267,12 @@ def make_bets(browser=None):
     match_urls = [url for url in match_urls if not url in urls_to_skip]
 
     for bet_url in match_urls:
-        handle_match(bet_url, browser, sleep_length)
+        try:
+            handle_match(bet_url, browser)
+        except Exception as e:
+            break
 
-    browser.close()
-    return sleep_length
+    # browser.close()
 
 
 def update_wagers(browser):
@@ -286,13 +294,14 @@ if __name__ == "__main__":
     # prevents mysterious code hangs sometimes when you do browser.get
     outer_browser.set_page_load_timeout(20)
     while True:
-        sleep_length = 60 * 30
         try:
             # this min makes sure that new betting opportunities are caught if they are added before the next match
-            sleep_length = min(make_bets(outer_browser), sleep_length)
+            make_bets(outer_browser)
         except Exception as e:
             sleep_length = 60
             print("Error while betting", e)
             print(traceback.format_exc())
+        if sleep_length == None:
+            sleep_length = 60
         print("Sleeping until", str(datetime.now() + timedelta(seconds=sleep_length)))
         sleep(sleep_length)

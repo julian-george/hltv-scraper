@@ -16,6 +16,7 @@ from services.map_service import maps_to_examine
 
 
 model_name = "prediction_model"
+csv_folder = "learning_data/"
 
 
 # Update this as Active Duty maps change
@@ -57,7 +58,7 @@ def predict_match(match, map_infos=None, same_order=True, ignore_cache=False):
         # print(processed_w)
         # with open("t.txt", "w") as f:
         #     f.write("\n".join(sorted(list(processed_w.columns))))
-        processed_w.to_csv(f"w_{i}_unplayed.csv")
+        processed_w.to_csv(csv_folder + f"w_{i}_unplayed.csv")
         processed_w = processed_w.to_numpy()
         prediction = list(model.predict(processed_w, verbose=False)[0])
         map_predictions[map_info["map_name"]] = prediction

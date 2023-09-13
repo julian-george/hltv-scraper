@@ -5,21 +5,21 @@ from betting_helper import generic_wait
 from betting_market import market_bet
 
 
-def match_bet(predictions_dict, bet_url, num_maps, bet_browser=None):
+def match_bet(predictions_dict, bet_url, num_maps, browser=None):
     print("match_bet")
-    bet_browser.get(bet_url)
+    browser.get(bet_url)
     print("GET", bet_url)
     market_elements = []
     if num_maps == 1:
         market_elements.append(
-            generic_wait(bet_browser).until(
+            generic_wait(browser).until(
                 EC.presence_of_element_located((By.CLASS_NAME, "main-market"))
             )
         )
     else:
         try:
             market_elements = list(
-                generic_wait(bet_browser).until(
+                generic_wait(browser).until(
                     EC.presence_of_all_elements_located(
                         (
                             By.CSS_SELECTOR,
@@ -49,10 +49,8 @@ def match_bet(predictions_dict, bet_url, num_maps, bet_browser=None):
     for title, element in market_element_dict.items():
         print("Betting", title, bet_url, predictions_dict)
         sleep(0.5)
-        successful_bets[title] = market_bet(
-            predictions_dict[title], element, bet_browser
-        )
+        successful_bets[title] = market_bet(predictions_dict[title], element, browser)
 
-    # bet_browser.close()
+    # browser.close()
     print("Successful Bets", successful_bets)
     return successful_bets

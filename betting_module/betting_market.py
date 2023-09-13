@@ -3,6 +3,7 @@ from time import sleep
 from datetime import datetime
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import StaleElementReferenceException
 
 from betting_helper import generic_wait, medium_wait, long_wait, balance_check
 
@@ -40,11 +41,11 @@ def weighted_prediction(prediction):
     return prediction
 
 
-def market_bet(prediction, market_element, bet_browser):
+def market_bet(prediction, market_element, browser):
     page_home_odds = None
     page_away_odds = None
     total_balance = None
-    close_bets(bet_browser)
+    close_bets(browser)
     # print(market_element.get_attribute("innerHTML"))
     try:
         home_button = market_element.find_element(
@@ -56,30 +57,35 @@ def market_bet(prediction, market_element, bet_browser):
         )
 
         page_home_odds = float(
-            generic_wait.until(
+            generic_wait(browser)
+            .until(
                 lambda _: home_button.find_element(
                     By.CSS_SELECTOR, "span.odds-button__odds"
                 )
-            ).text
+            )
+            .text
         )
         page_away_odds = float(
-            generic_wait.until(
+            generic_wait(browser)
+            .until(
                 lambda _: away_button.find_element(
                     By.CSS_SELECTOR, "span.odds-button__odds"
                 )
-            ).text
+            )
+            .text
         )
-        generic_wait(bet_browser).until(balance_check)
+        generic_wait(browser).until(balance_check)
         # this waits for the stupid aniamtion to finish
         sleep(0.5)
         total_balance = float(
-            bet_browser.find_element(
-                By.CSS_SELECTOR, "div.wallet-select__value>span"
-            ).text
+            browser.find_element(By.CSS_SELECTOR, "div.wallet-select__value>span").text
         )
         print(f"[{str(datetime.now())}] Current Balance: $" + str(total_balance))
-    except Exception:
-        print("Market locked")
+    except StaleElementReferenceException as e:
+        print("Market Locked")
+        return None
+    except Exception as e:
+        print("Error loading market", e)
         return None
     total_odds = round((page_home_odds - 1) + (page_away_odds - 1), 3)
     # counterintuitive, but for example if away odds are 12, we want new home odds to be high, not new away odds
@@ -119,7 +125,7 @@ def market_bet(prediction, market_element, bet_browser):
             # "try_num": 0,
         }
     try:
-        pending_bet_input = long_wait(bet_browser).until(
+        pending_bet_input = long_wait(browser).until(
             EC.presence_of_element_located(
                 (
                     By.CSS_SELECTOR,
@@ -133,12 +139,10 @@ def market_bet(prediction, market_element, bet_browser):
             max(total_balance * bet_percent, min_bet_amount), max_bet_amount
         )
         pending_bet_input.send_keys(amount_to_bet)
-        submit_button = bet_browser.find_element(
-            By.CLASS_NAME, "bet-slip__floating-button"
-        )
+        submit_button = browser.find_element(By.CLASS_NAME, "bet-slip__floating-button")
         submit_button.click()
         sleep(1)
-        medium_wait(bet_browser).until(
+        medium_wait(browser).until(
             EC.presence_of_element_located(
                 (
                     By.CSS_SELECTOR,
@@ -146,7 +150,7 @@ def market_bet(prediction, market_element, bet_browser):
                 )
             )
         )
-        close_bets(bet_browser)
+        close_bets(browser)
 
         return {
             "prediction": prediction,
@@ -158,5 +162,5 @@ def market_bet(prediction, market_element, bet_browser):
     except Exception as e:
         print("Error while confirming bet")
         print(traceback.format_exc())
-        close_bets(bet_browser)
+        close_bets(browser)
         return None
