@@ -171,6 +171,7 @@ def handle_match(bet_url, browser):
         sleep_length = 30
         return
     predictions = predict_match(match, map_infos, same_order)
+    print("pred", predictions)
     if len(map_names) == 1:
         market_prediction_dict["Match"] = predictions[map_names[0]]
     else:
