@@ -47,33 +47,11 @@ def match_bet(predictions_dict, bet_url, num_maps, bet_browser=None):
 
     successful_bets = {}
     for title, element in market_element_dict.items():
-        # market_bets.append(
-        #     threading.Thread(
-        #         market_bet,
-        #         args=(predictions_dict[title], element, bet_browser),
-        #         daemon=True,
-        #     )
-        # )
-        # market_bets.append(
-        #     (
-        #         title,
-        #         pool.apply_async(
-        #             market_bet, (predictions_dict[title], element, bet_browser)
-        #         ),
-        #     )
-        # )
         print("Betting", title, bet_url, predictions_dict)
         sleep(0.5)
         successful_bets[title] = market_bet(
             predictions_dict[title], element, bet_browser
         )
-
-    # wait for all bet threads to conclude before continuing
-    # for bet_thread_tuple in market_bets:
-    #     bet_title = bet_thread_tuple[0]
-    #     bet_success = bet_thread_tuple[1].get()
-    #     if bet_success:
-    #         successful_bets.append(bet_title)
 
     # bet_browser.close()
     print("Successful Bets", successful_bets)

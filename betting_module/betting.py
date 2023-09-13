@@ -10,8 +10,6 @@ from selenium.webdriver.support import expected_conditions as EC
 
 from betting_helper import generic_wait, long_wait, balance_check
 from betting_match import match_bet
-
-
 from predicting import (
     predict_match,
     confirm_bet,
@@ -19,11 +17,9 @@ from predicting import (
     get_unplayed_match_by_team_names,
 )
 
-
 prediction_threshold = timedelta(minutes=10)
 
 total_balance = None
-
 
 # service = Service(executable_path=ChromeDriverManager().install())
 # service = None

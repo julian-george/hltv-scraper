@@ -1,19 +1,7 @@
-import pymongo
-import os
-import threading
 import traceback
-from multiprocessing.pool import ThreadPool
 from time import sleep
-from datetime import datetime, timedelta
-from webdriver_manager.chrome import ChromeDriverManager
-from undetected_chromedriver import Chrome, ChromeOptions
-
-# from selenium.webdriver import Chrome,ChromeOptions
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.keys import Keys
+from datetime import datetime
 from selenium.webdriver.common.by import By
-from selenium.common.exceptions import StaleElementReferenceException
-from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 from betting_helper import generic_wait, medium_wait, long_wait, balance_check
