@@ -52,7 +52,7 @@ const responseHeadersToRemove = [
 
 const BASE_URL = "https://www.hltv.org";
 
-let ips = null;
+let ips: string[] = [];
 
 let availableHeadlessBrowsers: Browser[] = [];
 let availableHeadfulBrowsers: Browser[] = [];
@@ -80,7 +80,7 @@ const addNewBrowser = async (headful: boolean) => {
     console.error("No more IPs available");
     return;
   }
-  const slot = emptySlots.pop();
+  const slot = emptySlots?.pop() || 0;
   const positionFlag = `--window-position=${
     (slot % MAX_WINDOW_COLS) * WINDOW_WIDTH
   },${Math.floor(slot / MAX_WINDOW_COLS) * WINDOW_HEIGHT}`;
@@ -103,6 +103,7 @@ const addNewBrowser = async (headful: boolean) => {
   });
   // Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36
   // Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36
+  // @ts-ignore
   browserDict[newBrowser.process().pid] = {
     ip,
     anonymizedIp,
@@ -120,17 +121,16 @@ const addNewBrowser = async (headful: boolean) => {
   (async () => {
     if (IP_URL) {
       try {
-        ips = await (await fetch(IP_URL))?.text();
+        ips = (await (await fetch(IP_URL))?.text()).split("\n");
       } catch (e) {
         console.error("Failed to download ips, drawing from text file", e);
       }
     }
     if (!ips) {
-      ips = fs.readFileSync("ips.txt", { encoding: "utf8" });
+      ips = fs.readFileSync("ips.txt", { encoding: "utf8" }).split("\n");
     } else {
-      fs.writeFileSync("ips.txt", ips);
+      fs.writeFileSync("ips.txt", ips.join("\n"));
     }
-    ips = ips.split("\n");
     // Removes the empty last line that these text files often have
     ips = ips.filter((ip: string) => ip != "");
     // Ensures that certain IPs don't get used and blocked more than others
@@ -214,7 +214,12 @@ const puppeteerGetInner = async (
     return;
   }
 
-  const browserId = currBrowser.process().pid;
+  // The -1 fallback is dumb
+  const browserId: number = currBrowser?.process()?.pid || -1;
+
+  if (browserId == -1) {
+    console.error("BROWSER WITHOUT PID!!!!??");
+  }
 
   browserDict[browserId].currentUrl = url;
 

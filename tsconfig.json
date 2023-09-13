@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
+    "baseUrl": "./scraping_module",
     "module": "ES6",
     "esModuleInterop": true,
     "target": "es2022",

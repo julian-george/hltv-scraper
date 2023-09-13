@@ -5,11 +5,11 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev": "npx ts-node index.ts",
+    "dev": "npx ts-node scraping_module/index.ts",
     "build": "npx tsc",
     "start": "node --trace-warnings dist/index.js",
     "log": "yarn start > log.txt 2> error-log.txt",
-    "clean": "rm -rf dist/**; rm matrix.npy; rm processed-maps.json; rm *.sav; rm cf.png; rm log.txt; rm error-log.txt; rm frame.csv; rm -r prediction_model"
+    "clean": "rm -rf dist/**; "
   },
   "author": "",
   "license": "ISC",

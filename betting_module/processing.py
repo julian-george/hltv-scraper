@@ -17,6 +17,8 @@ client = pymongo.MongoClient(os.environ["MONGODB_URI"])
 db = client["scraped-hltv"]
 maps = db["maps"]
 
+csv_folder = "learning_data/"
+
 lookup_aggregation = [
     {
         "$lookup": {
@@ -62,7 +64,7 @@ def predict_map(map, i):
     winner = w["winner"]
     del w["winner"]
     processed_w = process_frame(pd.DataFrame([w]))[0]
-    processed_w.to_csv(f"w_{i}_played.csv")
+    processed_w.to_csv(csv_folder + f"w_{i}_played.csv")
     prediction = list(model.predict(processed_w.to_numpy())[0].round(5))
     # if not same_order:
     #     prediction.reverse()
@@ -70,8 +72,8 @@ def predict_map(map, i):
 
 
 if __name__ == "__main__":
-    frame_file_path = "./frame.csv"
-    map_history_file_path = "./processed-maps.json"
+    frame_file_path = csv_folder + "frame.csv"
+    map_history_file_path = csv_folder + "processed-maps.json"
 
     # we use this so that the matrix is mutated, not replaced, within threads
     feature_data = SimpleNamespace()

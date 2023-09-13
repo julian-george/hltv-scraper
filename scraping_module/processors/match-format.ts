@@ -1,7 +1,7 @@
 const formatProcessor = (formatString?: string) => {
   if (!formatString) return null;
   formatString = formatString.toLowerCase();
-  let formatCategory = null;
+  let formatCategory: number | null = null;
   if (formatString.includes("best of 7")) {
     formatCategory = 7;
   } else if (formatString.includes("best of 5")) {

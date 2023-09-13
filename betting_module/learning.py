@@ -15,12 +15,13 @@ from sklearn.model_selection import train_test_split
 from learning_helper import process_frame
 from predicting import map_ids_to_examine
 
+csv_folder = "learning_data/"
 
-frame_file_path = "saved-frame.csv"
-processed_frame_file_path = "processed-frame.csv"
-examine_frame_file_path = "examine-frame.csv"
-examine_ids_file_path = "examine-ids.csv"
-matrix_file_path = "cached-matrix.npy"
+frame_file_path = csv_folder + "saved-frame.csv"
+processed_frame_file_path = csv_folder + "processed-frame.csv"
+examine_frame_file_path = csv_folder + "examine-frame.csv"
+examine_ids_file_path = csv_folder + "examine-ids.csv"
+matrix_file_path = csv_folder + "cached-matrix.npy"
 
 feature_frame = None
 feature_matrix = None
@@ -221,7 +222,7 @@ validation_split = 0.25
 # stop_early = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3)
 scores = []
 model = None
-csv_logger = tf.keras.callbacks.CSVLogger("metrics.csv")
+csv_logger = tf.keras.callbacks.CSVLogger(csv_folder + "metrics.csv")
 print(normalized_X.shape[1], num_features)
 for i in range(1):
     model = build_model()
@@ -233,14 +234,14 @@ for i in range(1):
         epochs=epoch_num,
         callbacks=[
             tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3),
-            tf.keras.callbacks.CSVLogger("metrics.csv"),
+            tf.keras.callbacks.CSVLogger(csv_folder + "metrics.csv"),
         ],
         # sample_weight=X_train_wights,
     )
     for i, test_set in enumerate(test_sets):
         print(test_set[2])
         print(test_set[1])
-        pd.DataFrame(test_set[0]).to_csv(f"w_{i}_learning.csv")
+        pd.DataFrame(test_set[0]).to_csv(csv_folder + f"w_{i}_learning.csv")
         scores.append(
             round(model.evaluate(test_set[0], test_set[1], batch_size=1)[1], 3)
         )
