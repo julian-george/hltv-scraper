@@ -431,7 +431,11 @@ def make_bets(browser=None):
                 [
                     map_betted
                     for map_betted in match["betted"].values()
-                    if map_betted != None and map_betted["betted_odds"] != None
+                    if map_betted != None
+                    and (
+                        map_betted["betted_odds"] != None
+                        or map_betted.get("try_num", 0) == betting_odds_attempts
+                    )
                 ]
             )
             == match["numMaps"]
@@ -492,6 +496,7 @@ def make_bets(browser=None):
                     confirm_bet(match["hltvId"], {market_name: True})
                 if map_names[i] in predictions:
                     market_prediction_dict[market_name] = predictions[map_names[i]]
+        print(market_prediction_dict, match.get("betted", None))
 
         # ensures that already betted markets aren't betted again
         market_prediction_dict = {
@@ -504,6 +509,8 @@ def make_bets(browser=None):
                 and match["betted"][k]["try_num"] < betting_odds_attempts
             )
         }
+
+        print(market_prediction_dict)
         # map_threads.append(
         #     map_pool.apply_async(match_bet, (market_prediction_dict, bet_url)).get()
         # )
