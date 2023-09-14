@@ -98,7 +98,7 @@ def market_bet(prediction, market_element, browser):
     if (
         prediction[1] >= underdog_threshold
         and weighted_prediction(prediction[1]) >= home_odds
-        and away_odds > site_odd_threshold
+        and home_odds > site_odd_threshold
     ):
         home_win = True
         betted_odds = home_odds
