@@ -70,14 +70,17 @@ def handle_match(bet_url, browser):
             .text
         )
     except:
-        print("Unable to find match date")
-    if date_past_threshold(match_date):
+        pass
+        # print("Unable to find match date")
+    print(match_date)
+    if match_date != None and date_past_threshold(match_date):
         if sleep_length == None:
             sleep_length = (match_date - datetime.now()).total_seconds() - 600
             # print("new sleep length", sleep_length)
         # browser.close()
         print("Past threshold, ending until bet at", bet_url)
         raise Exception()
+
     home_team = (
         generic_wait(browser)
         .until(
@@ -128,14 +131,14 @@ def handle_match(bet_url, browser):
         map_infos = []
         browser.get("https://www.hltv.org" + match["matchUrl"])
         print("Page loaded", match["matchUrl"])
-        print(
-            "wait result",
-            WebDriverWait(browser, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "div.mapholder"))
-            ),
-        )
+        # print(
+        #     "wait result",
+        #     WebDriverWait(browser, 10).until(
+        #         EC.presence_of_element_located((By.CSS_SELECTOR, "div.mapholder"))
+        #     ),
+        # )
         mapholders = browser.find_elements(By.CSS_SELECTOR, "div.mapholder")
-        print(len(mapholders), "mapholders found")
+        # print(len(mapholders), "mapholders found")
         for i, holder in enumerate(mapholders):
             map_name = holder.find_element(By.CSS_SELECTOR, "div.mapname").text
             picked_by = None
@@ -164,7 +167,6 @@ def handle_match(bet_url, browser):
         sleep_length = 30
         return
     predictions = predict_match(match, map_infos, same_order)
-    print("pred", predictions)
     if len(map_names) == 1:
         market_prediction_dict["Match"] = predictions[map_names[0]]
     else:
@@ -210,6 +212,9 @@ def handle_match(bet_url, browser):
     confirm_bet(match["hltvId"], betted_markets)
 
 
+non_date_section_titles = ["Featured", "Live in-play", "Upcoming"]
+
+
 def make_bets(browser=None):
     global sleep_length
     sleep_length = None
@@ -241,35 +246,39 @@ def make_bets(browser=None):
     match_urls = []
 
     for match_section in match_sections:
-        title = (
-            generic_wait(browser)
-            .until(
-                lambda _: match_section.find_element(By.CLASS_NAME, "match-group-title")
-            )
-            .text
+        generic_wait(browser).until(
+            lambda _: match_section.find_element(
+                By.CLASS_NAME, "match-group-title"
+            ).text
+            != ""
         )
-        all_match_urls = [
+        title = match_section.find_element(By.CLASS_NAME, "match-group-title").text
+        date_suffix = ""
+        if title not in non_date_section_titles:
+            date_suffix = title + " "
+        section_match_urls = [
             match.find_element(
                 By.CSS_SELECTOR, "a.match-row__total-markets"
-            ).get_attribute()
+            ).get_attribute("href")
             for match in match_section.find_elements(
                 By.CSS_SELECTOR, "div.match-row__container"
             )
-            if not date_past_threshold(
-                match.find_element(By.CSS_SELECTOR, "div.match-row__match-info").text
+            if (
+                len(
+                    match.find_elements(
+                        By.CSS_SELECTOR, "div.thp-game-icon--square-fill"
+                    )
+                )
+                == 1
+                or not date_past_threshold(
+                    date_suffix
+                    + match.find_element(
+                        By.CSS_SELECTOR, "div.match-row__match-info"
+                    ).text
+                )
             )
         ]
-        print(title, all_match_urls)
-        # if title != "Featured":
-        # match_urls += list(
-        #     map(
-        #         lambda link: link.get_attribute("href"),
-        #         match_section.find_elements(
-        #             By.CSS_SELECTOR, "a.match-row__total-markets"
-        #         ),
-        #     )
-        # )
-
+        match_urls += section_match_urls
     match_urls = [url for url in match_urls if not url in urls_to_skip]
     for bet_url in match_urls:
         try:

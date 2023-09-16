@@ -81,11 +81,9 @@ def market_bet(prediction, market_element, browser):
             browser.find_element(By.CSS_SELECTOR, "div.wallet-select__value>span").text
         )
         print(f"[{str(datetime.now())}] Current Balance: $" + str(total_balance))
-    except StaleElementReferenceException as e:
-        print("Market Locked")
-        return None
     except Exception as e:
-        print("Error loading market", e)
+        print("Market Locked")
+        traceback.format_exc()
         return None
     total_odds = round((page_home_odds - 1) + (page_away_odds - 1), 3)
     # counterintuitive, but for example if away odds are 12, we want new home odds to be high, not new away odds

@@ -1,3 +1,4 @@
+import dateparser
 from datetime import datetime, timedelta
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.common.exceptions import StaleElementReferenceException
@@ -39,9 +40,8 @@ def date_past_threshold(date):
     now = datetime.now()
     if date == None:
         date = now
-    current_year = str(now.year)
-    parsed_date = datetime.strptime(current_year + " " + date, "%Y %B %d, %H:%M")
+    parsed_date = dateparser.parse(date)
     if parsed_date - now > prediction_threshold:
-        return False
-    else:
         return True
+    else:
+        return False
