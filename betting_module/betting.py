@@ -8,15 +8,13 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-from betting_helper import generic_wait, long_wait, balance_check
+from betting_helper import generic_wait, long_wait, balance_check, date_past_threshold
 from betting_match import match_bet
 from predicting import (
     predict_match,
     get_unplayed_match_by_team_names,
 )
 from services.unplayedmatch_service import confirm_bet, set_maps
-
-prediction_threshold = timedelta(minutes=10)
 
 total_balance = None
 
@@ -63,8 +61,6 @@ def handle_match(bet_url, browser):
     global sleep_length
     browser.get(bet_url)
     match_date = None
-    now = datetime.now()
-    current_year = str(datetime.now().year)
     try:
         match_date = (
             generic_wait(browser)
@@ -73,16 +69,12 @@ def handle_match(bet_url, browser):
             )
             .text
         )
-        match_date = datetime.strptime(
-            current_year + " " + match_date, "%Y %B %d, %H:%M"
-        )
     except:
-        match_date = now
-    if match_date - now > prediction_threshold:
-        print(sleep_length)
+        print("Unable to find match date")
+    if date_past_threshold(match_date):
         if sleep_length == None:
-            sleep_length = (match_date - now).total_seconds() - 600
-            print("new sleep length", sleep_length)
+            sleep_length = (match_date - datetime.now()).total_seconds() - 600
+            # print("new sleep length", sleep_length)
         # browser.close()
         print("Past threshold, ending until bet at", bet_url)
         raise Exception()
@@ -108,6 +100,7 @@ def handle_match(bet_url, browser):
         home_team, away_team, datetime.now()
     )
     # if this match isnt in the database or it has been fully bet on, skip
+    print(match["betted"] if match != None else None)
     if match == None:
         print("No match found for", home_team, away_team)
         urls_to_skip.append(bet_url)
@@ -201,7 +194,7 @@ def handle_match(bet_url, browser):
     betted_markets = match_bet(
         market_prediction_dict, bet_url, match["numMaps"], browser
     )
-    print("betted_markets", betted_markets)
+    # print("betted_markets", betted_markets)
     for market_name, market_dict in betted_markets.items():
         if market_dict == None:
             sleep_length = 30
@@ -210,7 +203,7 @@ def handle_match(bet_url, browser):
             curr_tries = ((match.get("betted", {}).get(market_name, None)) or {}).get(
                 "try_num", 0
             )
-            print("Current tries", curr_tries)
+            # print("Current tries", curr_tries)
             betted_markets[market_name]["try_num"] = curr_tries + 1
             sleep_length = min(sleep_length, 60) if sleep_length is not None else 60
 
@@ -255,22 +248,34 @@ def make_bets(browser=None):
             )
             .text
         )
-        if title != "Featured":
-            match_urls += list(
-                map(
-                    lambda link: link.get_attribute("href"),
-                    match_section.find_elements(
-                        By.CSS_SELECTOR, "a.match-row__total-markets"
-                    ),
-                )
+        all_match_urls = [
+            match.find_element(
+                By.CSS_SELECTOR, "a.match-row__total-markets"
+            ).get_attribute()
+            for match in match_section.find_elements(
+                By.CSS_SELECTOR, "div.match-row__container"
             )
+            if not date_past_threshold(
+                match.find_element(By.CSS_SELECTOR, "div.match-row__match-info").text
+            )
+        ]
+        print(title, all_match_urls)
+        # if title != "Featured":
+        # match_urls += list(
+        #     map(
+        #         lambda link: link.get_attribute("href"),
+        #         match_section.find_elements(
+        #             By.CSS_SELECTOR, "a.match-row__total-markets"
+        #         ),
+        #     )
+        # )
 
     match_urls = [url for url in match_urls if not url in urls_to_skip]
-
     for bet_url in match_urls:
         try:
             handle_match(bet_url, browser)
         except Exception as e:
+            print("Error with match", bet_url, e)
             break
 
     # browser.close()

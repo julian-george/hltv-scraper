@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.common.exceptions import StaleElementReferenceException
 from selenium.webdriver.common.by import By
@@ -29,3 +30,18 @@ def medium_wait(browser):
 
 def long_wait(browser):
     return WebDriverWait(browser, 30, ignored_exceptions=ignored_exceptions)
+
+
+prediction_threshold = timedelta(minutes=10)
+
+
+def date_past_threshold(date):
+    now = datetime.now()
+    if date == None:
+        date = now
+    current_year = str(now.year)
+    parsed_date = datetime.strptime(current_year + " " + date, "%Y %B %d, %H:%M")
+    if parsed_date - now > prediction_threshold:
+        return False
+    else:
+        return True
