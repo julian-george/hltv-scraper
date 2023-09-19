@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 from webdriver_manager.chrome import ChromeDriverManager
 from undetected_chromedriver import Chrome, ChromeOptions
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 from betting_helper import generic_wait, long_wait, balance_check, date_past_threshold
@@ -15,6 +14,7 @@ from predicting import (
     get_unplayed_match_by_team_names,
 )
 from services.unplayedmatch_service import confirm_bet, set_maps
+from services.wager_service import insert_wager, wager_exists, update_wager_result
 
 total_balance = None
 
@@ -291,14 +291,69 @@ def make_bets(browser=None):
 
 
 def update_wagers(browser):
-    tab_elements = generic_wait(browser).until(
-        EC.presence_of_all_elements_located((By.CLASS_NAME, "navbar-main-tabs__tab"))
+    # first insert new wagers that are still pending
+    browser.get("https://thunderpick.io/en/profile/pending-bets")
+    sleep(1)
+    bet_table = generic_wait(browser).until(
+        EC.presence_of_element_located(
+            (By.CSS_SELECTOR, "div.match-betting-list>div.thp-table")
+        )
     )
-    wagers_tab = tab_elements[2]
-    wagers_tab.click()
+    wager_rows = bet_table.find_elements(By.CLASS_NAME, "thp-table-row")
+    for wager_row in wager_rows:
+        wager_id = wager_row.get_attribute("id").replace("InPlays-", "")
+        if wager_exists(wager_id):
+            print("already exists")
+            break
+        wager_row.find_element(By.CSS_SELECTOR, "i.thp-table-row__arrow").click()
+        match_title = wager_row.find_element(
+            By.CSS_SELECTOR, "div.thp-list__description > a.participants"
+        ).get_attribute("title")
+        team_names = match_title.split(" vs ")
+        hltv_match = get_unplayed_match_by_team_names(team_names[0], team_names[1])[0]
+        match_id = hltv_match["hltvId"]
+        amount_betted = float(
+            wager_row.find_element(By.CLASS_NAME, "thp-table-column__bet")
+            .find_element(By.CSS_SELECTOR, "span.coin-amount__amount")
+            .text
+        )
+        odds = float(
+            wager_row.find_element(By.CLASS_NAME, "thp-table-column__odds")
+            .find_element(By.CSS_SELECTOR, "span.odds")
+            .text
+        )
+        new_wager = {
+            "wagerId": wager_id,
+            "matchId": match_id,
+            "amountBetted": amount_betted,
+            "odds": odds,
+        }
+        insert_wager(new_wager)
+        print(new_wager)
 
-    # navbar-main-tabs__tab
-    pass
+    browser.get("https://thunderpick.io/en/profile/bet-history")
+    sleep(1)
+    bet_table = generic_wait(browser).until(
+        EC.presence_of_element_located(
+            (By.CSS_SELECTOR, "div.match-betting-list>div.thp-table")
+        )
+    )
+    wager_rows = bet_table.find_elements(By.CLASS_NAME, "thp-table-row")
+    for wager_row in wager_rows:
+        wager_id = wager_row.get_attribute("id").replace("InPlays-", "")
+        wager = wager_exists(wager_id)
+        if not wager:
+            break
+        return_ele = wager_row.find_element(
+            By.CLASS_NAME, "thp-table-column__return"
+        ).find_element(By.CLASS_NAME, "coin-amount")
+        return_ele_classes = return_ele.get_attribute("class").split(" ")
+        result = "CANCELLED"
+        if "t--green" in return_ele_classes:
+            result = "WON"
+        elif "t--red" in return_ele_classes:
+            result = "LOST"
+        update_wager_result(wager_id, result)
 
 
 if __name__ == "__main__":
@@ -312,6 +367,7 @@ if __name__ == "__main__":
         try:
             # this min makes sure that new betting opportunities are caught if they are added before the next match
             make_bets(outer_browser)
+            update_wagers(outer_browser)
         except Exception as e:
             sleep_length = 60
             print("Error while betting", e)
