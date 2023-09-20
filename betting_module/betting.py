@@ -301,7 +301,11 @@ def update_wagers(browser):
     )
     wager_rows = bet_table.find_elements(By.CLASS_NAME, "thp-table-row")
     for wager_row in wager_rows:
-        wager_id = wager_row.get_attribute("id").replace("InPlays-", "")
+        wager_id = (
+            wager_row.get_attribute("id")
+            .replace("InPlays-", "")
+            .replace("PreMatch-", "")
+        )
         if wager_exists(wager_id):
             print("already exists")
             break
@@ -340,7 +344,11 @@ def update_wagers(browser):
     )
     wager_rows = bet_table.find_elements(By.CLASS_NAME, "thp-table-row")
     for wager_row in wager_rows:
-        wager_id = wager_row.get_attribute("id").replace("InPlays-", "")
+        wager_id = (
+            wager_row.get_attribute("id")
+            .replace("InPlays-", "")
+            .replace("PreMatch-", "")
+        )
         wager = wager_exists(wager_id)
         if not wager:
             break
