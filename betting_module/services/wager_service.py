@@ -18,4 +18,4 @@ def insert_wager(wager):
 
 
 def update_wager_result(wager_id, new_result):
-    wagers.find_one_and_update({"wagerId": wager_id, "result": new_result})
+    wagers.find_one_and_update({"wagerId": wager_id}, {"result": new_result})
