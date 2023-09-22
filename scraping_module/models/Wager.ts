@@ -8,6 +8,7 @@ export const wagerSchema = new Schema({
   matchId: Number,
   amountBetted: Number,
   odds: Number,
+  creationDate: Date,
   result: {
     type: String,
     enum: ["UNFINISHED", "WON", "LOST", "CANCELLED"],

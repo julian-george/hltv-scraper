@@ -7,7 +7,13 @@ from undetected_chromedriver import Chrome, ChromeOptions
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 
-from betting_helper import generic_wait, long_wait, balance_check, date_past_threshold
+from betting_helper import (
+    generic_wait,
+    medium_wait,
+    long_wait,
+    balance_check,
+    date_past_threshold,
+)
 from betting_match import match_bet
 from predicting import (
     predict_match,
@@ -246,7 +252,7 @@ def make_bets(browser=None):
     match_urls = []
 
     for match_section in match_sections:
-        generic_wait(browser).until(
+        medium_wait(browser).until(
             lambda _: match_section.find_element(
                 By.CLASS_NAME, "match-group-title"
             ).text
@@ -326,14 +332,15 @@ def update_wagers(browser):
             .find_element(By.CSS_SELECTOR, "span.odds")
             .text
         )
+        creation_date = datetime.now()
         new_wager = {
             "wagerId": wager_id,
             "matchId": match_id,
             "amountBetted": amount_betted,
             "odds": odds,
+            "creationDate": creation_date,
         }
         insert_wager(new_wager)
-        print(new_wager)
 
     browser.get("https://thunderpick.io/en/profile/bet-history")
     sleep(1)
