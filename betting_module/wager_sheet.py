@@ -49,11 +49,10 @@ def write_wagers(wagers):
         wager_range = []
         for wager in wagers:
             wager_link = get_match_url_by_id(wager["matchId"])
-            wager_title = (
-                get_match_title_by_id(wager["matchId"]) + f"- {wager['marketName']}"
-                if "marketName" in wager
-                else ""
+            wager_title = get_match_title_by_id(wager["matchId"]) + (
+                f"- {wager['marketName']}" if "marketName" in wager else ""
             )
+
             link_formula = f'=HYPERLINK("{wager_link}","{wager_title}")'
             wager_range.append(
                 [
