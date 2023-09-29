@@ -388,7 +388,7 @@ if __name__ == "__main__":
     while True:
         try:
             # this min makes sure that new betting opportunities are caught if they are added before the next match
-            # make_bets(outer_browser)
+            make_bets(outer_browser)
             update_wagers(outer_browser)
         except Exception as e:
             sleep_length = 60
