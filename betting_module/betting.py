@@ -369,6 +369,8 @@ def update_wagers(browser):
         wager = wager_exists(wager_id)
         if not wager:
             break
+        elif wager["result"] != "UNFINISHED":
+            break
         return_ele = wager_row.find_element(
             By.CLASS_NAME, "thp-table-column__return"
         ).find_element(By.CLASS_NAME, "coin-amount")
