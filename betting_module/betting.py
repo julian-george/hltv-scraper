@@ -160,7 +160,7 @@ def handle_match(bet_url, browser):
             elif right_picked:
                 picked_by = "teamTwo"
             map_info = {"map_name": map_name, "picked_by": picked_by, "map_num": i}
-            print("New map info", map_info)
+            # print("New map info", map_info)
             map_infos.append(map_info)
 
         set_maps(
@@ -183,7 +183,7 @@ def handle_match(bet_url, browser):
                 confirm_bet(match["hltvId"], {market_name: True})
             if map_names[i] in predictions:
                 market_prediction_dict[market_name] = predictions[map_names[i]]
-    print(market_prediction_dict, match.get("betted", None))
+    # print(market_prediction_dict, match.get("betted", None))
 
     # ensures that already betted markets aren't betted again
     market_prediction_dict = {
@@ -197,7 +197,7 @@ def handle_match(bet_url, browser):
         )
     }
 
-    print(market_prediction_dict)
+    # print(market_prediction_dict)
     print("Trying to bet on", match["title"])
 
     betted_markets = match_bet(
