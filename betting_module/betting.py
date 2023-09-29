@@ -328,7 +328,7 @@ def update_wagers(browser):
         hltv_match = get_unplayed_match_by_team_names(team_names[0], team_names[1])[0]
         match_id = hltv_match["hltvId"]
         market_name = wager_row.find_element(
-            By.CSS_SELECTOR, "div.thp-list__bet-name>span.bet-name"
+            By.CSS_SELECTOR, "div.thp-list__bet-name > span.bet-name"
         ).text
         amount_betted = float(
             wager_row.find_element(By.CLASS_NAME, "thp-table-column__bet")
