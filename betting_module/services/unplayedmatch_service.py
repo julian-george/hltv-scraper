@@ -128,3 +128,14 @@ def get_unplayed_match_by_id(id):
     if not match_cursor._has_next():
         return None
     return match_cursor.next()
+
+
+url_prefix = "https://www.hltv.org"
+
+
+def get_match_url_by_id(match_id):
+    return url_prefix + unplayed_matches.find_one({"hltvId": match_id})["matchUrl"]
+
+
+def get_match_title_by_id(match_id):
+    return unplayed_matches.find_one({"hltvId": match_id})["title"]

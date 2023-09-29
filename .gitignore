@@ -15,3 +15,5 @@ __pycache__
 model
 prediction_model
 .DS_Store
+google_token.json
+google_credentials.json

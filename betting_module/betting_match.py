@@ -6,7 +6,7 @@ from betting_market import market_bet
 
 
 def match_bet(predictions_dict, bet_url, num_maps, browser=None):
-    print("match_bet")
+    # print("match_bet")
     browser.get(bet_url)
     print("GET", bet_url)
     market_elements = []

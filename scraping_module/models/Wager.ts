@@ -6,6 +6,7 @@ export const wagerSchema = new Schema({
     unique: true,
   },
   matchId: Number,
+  marketName: String,
   amountBetted: Number,
   odds: Number,
   creationDate: Date,

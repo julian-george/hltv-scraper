@@ -21,6 +21,7 @@ from predicting import (
 )
 from services.unplayedmatch_service import confirm_bet, set_maps
 from services.wager_service import insert_wager, wager_exists, update_wager_result
+from wager_sheet import write_wagers
 
 total_balance = None
 
@@ -313,7 +314,7 @@ def update_wagers(browser):
             .replace("PreMatch-", "")
         )
         if wager_exists(wager_id):
-            print("already exists")
+            # print("already exists")
             break
         wager_row.find_element(By.CSS_SELECTOR, "i.thp-table-row__arrow").click()
         match_title = wager_row.find_element(
@@ -322,6 +323,9 @@ def update_wagers(browser):
         team_names = match_title.split(" vs ")
         hltv_match = get_unplayed_match_by_team_names(team_names[0], team_names[1])[0]
         match_id = hltv_match["hltvId"]
+        market_name = wager_row.find_element(
+            By.CSS_SELECTOR, "div.thp-list__bet-name>span.bet-name"
+        ).text
         amount_betted = float(
             wager_row.find_element(By.CLASS_NAME, "thp-table-column__bet")
             .find_element(By.CSS_SELECTOR, "span.coin-amount__amount")
@@ -336,9 +340,11 @@ def update_wagers(browser):
         new_wager = {
             "wagerId": wager_id,
             "matchId": match_id,
+            "marketName": market_name,
             "amountBetted": amount_betted,
             "odds": odds,
             "creationDate": creation_date,
+            "result": "UNFINISHED",
         }
         insert_wager(new_wager)
 
@@ -368,7 +374,8 @@ def update_wagers(browser):
             result = "WON"
         elif "t--red" in return_ele_classes:
             result = "LOST"
-        update_wager_result(wager_id, result)
+        updated_wager = update_wager_result(wager_id, result)
+        write_wagers([updated_wager])
 
 
 if __name__ == "__main__":
@@ -381,7 +388,7 @@ if __name__ == "__main__":
     while True:
         try:
             # this min makes sure that new betting opportunities are caught if they are added before the next match
-            make_bets(outer_browser)
+            # make_bets(outer_browser)
             update_wagers(outer_browser)
         except Exception as e:
             sleep_length = 60

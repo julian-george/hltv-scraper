@@ -29,7 +29,7 @@ def close_bets(browser):
 
 
 # minimum value for our model's prediction if we want to bet
-to_bet_threshold = 0.55
+to_bet_threshold = 0.6
 
 
 def weighted_prediction(prediction):
@@ -38,7 +38,9 @@ def weighted_prediction(prediction):
     # return prediction / weight
     if prediction < to_bet_threshold:
         return 0
-    return prediction
+    else:
+        return 1
+    # return prediction
 
 
 def market_bet(prediction, market_element, browser):
