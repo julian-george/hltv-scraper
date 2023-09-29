@@ -24,6 +24,7 @@ from services.wager_service import insert_wager, wager_exists, update_wager_resu
 from wager_sheet import write_wagers
 
 total_balance = None
+min_total_balance = 2
 
 # service = Service(executable_path=ChromeDriverManager().install())
 # service = None
@@ -224,6 +225,7 @@ non_date_section_titles = ["Featured", "Live in-play", "Upcoming"]
 
 def make_bets(browser=None):
     global sleep_length
+    global total_balance
     sleep_length = None
     # options.add_argument("--headless")
     browser.get("https://thunderpick.io/en/esports/csgo")
@@ -247,6 +249,8 @@ def make_bets(browser=None):
     total_balance = float(
         browser.find_element(By.CSS_SELECTOR, "div.wallet-select__value>span").text
     )
+    if total_balance < min_total_balance:
+        print("Out of money")
 
     print(f"[{str(datetime.now())}] Current Balance: $" + str(total_balance))
 
@@ -396,5 +400,8 @@ if __name__ == "__main__":
             print(traceback.format_exc())
         if sleep_length == None:
             sleep_length = 60
+        if total_balance < min_total_balance:
+            print("Out of money")
+            break
         print("Sleeping until", str(datetime.now() + timedelta(seconds=sleep_length)))
         sleep(sleep_length)
