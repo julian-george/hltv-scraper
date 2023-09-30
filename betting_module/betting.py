@@ -4,6 +4,7 @@ from time import sleep
 from datetime import datetime, timedelta
 from webdriver_manager.chrome import ChromeDriverManager
 from undetected_chromedriver import Chrome, ChromeOptions
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 
@@ -305,52 +306,57 @@ def update_wagers(browser):
     # first insert new wagers that are still pending
     browser.get("https://thunderpick.io/en/profile/pending-bets")
     sleep(1)
-    bet_table = generic_wait(browser).until(
-        EC.presence_of_element_located(
-            (By.CSS_SELECTOR, "div.match-betting-list>div.thp-table")
+    try:
+        bet_table = generic_wait(browser).until(
+            EC.presence_of_element_located(
+                (By.CSS_SELECTOR, "div.match-betting-list>div.thp-table")
+            )
         )
-    )
-    wager_rows = bet_table.find_elements(By.CLASS_NAME, "thp-table-row")
-    for wager_row in wager_rows:
-        wager_id = (
-            wager_row.get_attribute("id")
-            .replace("InPlays-", "")
-            .replace("PreMatch-", "")
-        )
-        if wager_exists(wager_id):
-            # print("already exists")
-            break
-        wager_row.find_element(By.CSS_SELECTOR, "i.thp-table-row__arrow").click()
-        match_title = wager_row.find_element(
-            By.CSS_SELECTOR, "div.thp-list__description > a.participants"
-        ).get_attribute("title")
-        team_names = match_title.split(" vs ")
-        hltv_match = get_unplayed_match_by_team_names(team_names[0], team_names[1])[0]
-        match_id = hltv_match["hltvId"]
-        market_name = wager_row.find_element(
-            By.CSS_SELECTOR, "div.thp-list__bet-name > span.bet-name"
-        ).text
-        amount_betted = float(
-            wager_row.find_element(By.CLASS_NAME, "thp-table-column__bet")
-            .find_element(By.CSS_SELECTOR, "span.coin-amount__amount")
-            .text
-        )
-        odds = float(
-            wager_row.find_element(By.CLASS_NAME, "thp-table-column__odds")
-            .find_element(By.CSS_SELECTOR, "span.odds")
-            .text
-        )
-        creation_date = datetime.now()
-        new_wager = {
-            "wagerId": wager_id,
-            "matchId": match_id,
-            "marketName": market_name,
-            "amountBetted": amount_betted,
-            "odds": odds,
-            "creationDate": creation_date,
-            "result": "UNFINISHED",
-        }
-        insert_wager(new_wager)
+        wager_rows = bet_table.find_elements(By.CLASS_NAME, "thp-table-row")
+        for wager_row in wager_rows:
+            wager_id = (
+                wager_row.get_attribute("id")
+                .replace("InPlays-", "")
+                .replace("PreMatch-", "")
+            )
+            if wager_exists(wager_id):
+                # print("already exists")
+                break
+            wager_row.find_element(By.CSS_SELECTOR, "i.thp-table-row__arrow").click()
+            match_title = wager_row.find_element(
+                By.CSS_SELECTOR, "div.thp-list__description > a.participants"
+            ).get_attribute("title")
+            team_names = match_title.split(" vs ")
+            hltv_match = get_unplayed_match_by_team_names(team_names[0], team_names[1])[
+                0
+            ]
+            match_id = hltv_match["hltvId"]
+            market_name = wager_row.find_element(
+                By.CSS_SELECTOR, "div.thp-list__bet-name > span.bet-name"
+            ).text
+            amount_betted = float(
+                wager_row.find_element(By.CLASS_NAME, "thp-table-column__bet")
+                .find_element(By.CSS_SELECTOR, "span.coin-amount__amount")
+                .text
+            )
+            odds = float(
+                wager_row.find_element(By.CLASS_NAME, "thp-table-column__odds")
+                .find_element(By.CSS_SELECTOR, "span.odds")
+                .text
+            )
+            creation_date = datetime.now()
+            new_wager = {
+                "wagerId": wager_id,
+                "matchId": match_id,
+                "marketName": market_name,
+                "amountBetted": amount_betted,
+                "odds": odds,
+                "creationDate": creation_date,
+                "result": "UNFINISHED",
+            }
+            insert_wager(new_wager)
+    except TimeoutException:
+        print("No pending bets to update")
 
     browser.get("https://thunderpick.io/en/profile/bet-history")
     sleep(1)
@@ -402,7 +408,7 @@ if __name__ == "__main__":
             print(traceback.format_exc())
         if sleep_length == None:
             sleep_length = 60
-        if total_balance < min_total_balance:
+        if total_balance != None and total_balance < min_total_balance:
             print("Out of money")
             break
         print("Sleeping until", str(datetime.now() + timedelta(seconds=sleep_length)))
