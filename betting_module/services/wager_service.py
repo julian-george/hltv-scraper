@@ -23,7 +23,9 @@ def insert_wager(wager):
 
 def update_wager_result(wager_id, new_result):
     return wagers.find_one_and_update(
-        {"wagerId": wager_id}, {"$set": {"result": new_result}}, return_document="after"
+        {"wagerId": wager_id},
+        {"$set": {"result": new_result}},
+        return_document=pymongo.ReturnDocument.AFTER,
     )
 
 
