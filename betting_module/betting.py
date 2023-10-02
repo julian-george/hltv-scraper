@@ -333,7 +333,7 @@ def update_wagers(browser):
             match_id = hltv_match["hltvId"]
             market_name = wager_row.find_element(
                 By.CSS_SELECTOR, "div.thp-list__bet-name > span.bet-name"
-            ).text
+            ).get_attribute("innerHTML")
             amount_betted = float(
                 wager_row.find_element(By.CLASS_NAME, "thp-table-column__bet")
                 .find_element(By.CSS_SELECTOR, "span.coin-amount__amount")
@@ -374,9 +374,9 @@ def update_wagers(browser):
         )
         wager = wager_exists(wager_id)
         if not wager:
-            break
+            continue
         elif wager["result"] != "UNFINISHED":
-            break
+            continue
         return_ele = wager_row.find_element(
             By.CLASS_NAME, "thp-table-column__return"
         ).find_element(By.CLASS_NAME, "coin-amount")
