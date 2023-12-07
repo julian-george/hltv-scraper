@@ -166,6 +166,10 @@ if __name__ == "__main__":
         feature_data.history = set()
         # feature_data.history = None
 
+    with open("columns.txt", "w") as f:
+        f.write("\n".join(sorted(column_names)))
+        print("E")
+
     try:
         feature_data.frame = pd.read_csv(frame_file_path, index_col=[0])
         feature_data.history = set(feature_data.frame["map_id"])
