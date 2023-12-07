@@ -195,7 +195,7 @@ const puppeteerGetInner = async (
     !allBrowsersCreated ||
     (headful ? availableHeadfulBrowsers : availableHeadlessBrowsers).length == 0
   ) {
-    console.log("no browsers available for url", url, "waiting");
+    // console.log("no browsers available for url", url, "waiting");
     await delay(0, 750);
   }
 
@@ -338,7 +338,7 @@ const puppeteerGetInner = async (
       responseData = await response.buffer();
       responseUrl = await response.url();
       tryCount++;
-      if (tryCount > 0) console.log(`try number ${tryCount}`);
+      // if (tryCount > 0) console.log(`try number ${tryCount}`);
     }
     if (
       responseBody.includes("challenge-running") ||

@@ -5,7 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev": "npx ts-node scraping_module/index.ts",
+    "dev": "npx ts-node --esm scraping_module/index.ts",
     "build": "npx tsc",
     "start": "node --trace-warnings dist/index.js",
     "log": "yarn start > log.txt 2> error-log.txt",
